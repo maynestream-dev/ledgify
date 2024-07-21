@@ -11,6 +11,8 @@
     </parent>
 
     <artifactId>ledgify-grpc-service</artifactId>
+    <!-- service modules versioned independent from parent -->
+    <version>1.0.0-SNAPSHOT</version>
 
     <packaging>pom</packaging>
 
@@ -18,6 +20,16 @@
         <module>ledgify-grpc-service-pom</module>
         <module>ledgify-grpc-service-common</module>
     </modules>
+
+    <dependencyManagement>
+        <dependencies>
+            <dependency>
+                <groupId>dev.maynestream.ledgify</groupId>
+                <artifactId>ledgify-grpc-service-common</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
 
     <build>
         <plugins>

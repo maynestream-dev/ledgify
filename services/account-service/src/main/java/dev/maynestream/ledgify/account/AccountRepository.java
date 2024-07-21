@@ -1,7 +1,7 @@
 package dev.maynestream.ledgify.account;
 
-import dev.maynestream.ledgify.account.tables.Account;
-import dev.maynestream.ledgify.account.tables.records.AccountRecord;
+import dev.maynestream.ledgify.domain.tables.Account;
+import dev.maynestream.ledgify.domain.tables.records.AccountRecord;
 import org.jooq.DSLContext;
 import org.springframework.stereotype.Component;
 

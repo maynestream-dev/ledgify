@@ -5,9 +5,8 @@
 
     <parent>
         <groupId>dev.maynestream.ledgify</groupId>
-        <artifactId>ledgify-parent-pom</artifactId>
+        <artifactId>ledgify-grpc-service</artifactId>
         <version>1.0.0-SNAPSHOT</version>
-        <relativePath>../../ledgify-parent-pom/pom.xml</relativePath>
     </parent>
 
     <artifactId>ledgify-grpc-service-pom</artifactId>
@@ -15,11 +14,10 @@
     <packaging>pom</packaging>
 
     <properties>
-        <ledgify-grpc-service-common.version>1.0.0-SNAPSHOT</ledgify-grpc-service-common.version>
+        <ledgify-domain.version>1.0.0-SNAPSHOT</ledgify-domain.version>
 
         <!-- build -->
         <postgres.version>16</postgres.version>
-        <protobuf-maven-plugin.version>0.6.1</protobuf-maven-plugin.version>
         <testcontainers-jooq-codegen-maven-plugin.version>0.0.4</testcontainers-jooq-codegen-maven-plugin.version>
     </properties>
 
@@ -27,8 +25,13 @@
         <!-- internal -->
         <dependency>
             <groupId>dev.maynestream.ledgify</groupId>
+            <artifactId>ledgify-domain</artifactId>
+            <version>${ledgify-domain.version}</version>
+        </dependency>
+
+        <dependency>
+            <groupId>dev.maynestream.ledgify</groupId>
             <artifactId>ledgify-grpc-service-common</artifactId>
-            <version>${ledgify-grpc-service-common.version}</version>
         </dependency>
 
         <!-- Spring -->
@@ -49,24 +52,6 @@
             <artifactId>spring-boot-devtools</artifactId>
             <scope>runtime</scope>
             <optional>true</optional>
-        </dependency>
-
-        <!-- gRPC support -->
-        <dependency>
-            <groupId>net.devh</groupId>
-            <artifactId>grpc-server-spring-boot-starter</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>io.grpc</groupId>
-            <artifactId>grpc-netty</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>javax.annotation</groupId>
-            <artifactId>javax.annotation-api</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>build.buf</groupId>
-            <artifactId>protovalidate</artifactId>
         </dependency>
 
         <!-- 3rd-party -->
@@ -131,26 +116,6 @@
     <build>
         <plugins>
             <plugin>
-                <groupId>org.xolstice.maven.plugins</groupId>
-                <artifactId>protobuf-maven-plugin</artifactId>
-                <version>${protobuf-maven-plugin.version}</version>
-                <executions>
-                    <execution>
-                        <goals>
-                            <goal>compile</goal>
-                            <goal>compile-custom</goal>
-                        </goals>
-                    </execution>
-                </executions>
-                <configuration>
-                    <pluginId>grpc-java</pluginId>
-                    <!--suppress UnresolvedMavenProperty -->
-                    <protocArtifact>com.google.protobuf:protoc:3.25.1:exe:${os.detected.classifier}</protocArtifact>
-                    <!--suppress UnresolvedMavenProperty -->
-                    <pluginArtifact>io.grpc:protoc-gen-grpc-java:${grpc.version}:exe:${os.detected.classifier}</pluginArtifact>
-                </configuration>
-            </plugin>
-            <plugin>
                 <groupId>org.testcontainers</groupId>
                 <artifactId>testcontainers-jooq-codegen-maven-plugin</artifactId>
                 <version>${testcontainers-jooq-codegen-maven-plugin.version}</version>
@@ -175,7 +140,7 @@
                                         <inputSchema>public</inputSchema>
                                     </database>
                                     <target>
-                                        <packageName>dev.maynestream.ledgify.account</packageName>
+                                        <packageName>dev.maynestream.ledgify.domain</packageName>
                                         <directory>target/generated-sources/jooq</directory>
                                     </target>
                                 </generator>

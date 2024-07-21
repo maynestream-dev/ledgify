@@ -1,6 +1,6 @@
 package dev.maynestream.ledgify.account;
 
-import dev.maynestream.ledgify.account.tables.records.AccountRecord;
+import dev.maynestream.ledgify.domain.tables.records.AccountRecord;
 import io.grpc.stub.StreamObserver;
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;

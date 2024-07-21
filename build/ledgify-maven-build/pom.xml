@@ -16,6 +16,7 @@
 
     <modules>
         <module>../../modules/ledgify-parent-pom</module>
+        <module>../../modules/ledgify-domain</module>
         <module>../../modules/ledgify-grpc-service</module>
         <module>../../services/account-service</module>
     </modules>
