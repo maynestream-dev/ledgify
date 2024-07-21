@@ -1,7 +1,8 @@
-package dev.maynestream.ledgify.account;
+package dev.maynestream.ledgify.error;
 
 import build.buf.protovalidate.exceptions.ValidationException;
 import build.buf.validate.Violation;
+import dev.maynestream.ledgify.validation.ConstraintViolationException;
 import io.grpc.Status;
 import net.devh.boot.grpc.server.advice.GrpcAdvice;
 import net.devh.boot.grpc.server.advice.GrpcExceptionHandler;

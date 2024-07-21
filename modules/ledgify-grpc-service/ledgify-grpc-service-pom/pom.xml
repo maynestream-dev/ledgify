@@ -1,0 +1,201 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>dev.maynestream.ledgify</groupId>
+        <artifactId>ledgify-parent-pom</artifactId>
+        <version>1.0.0-SNAPSHOT</version>
+        <relativePath>../../ledgify-parent-pom/pom.xml</relativePath>
+    </parent>
+
+    <artifactId>ledgify-grpc-service-pom</artifactId>
+
+    <packaging>pom</packaging>
+
+    <properties>
+        <ledgify-grpc-service-common.version>1.0.0-SNAPSHOT</ledgify-grpc-service-common.version>
+
+        <!-- build -->
+        <postgres.version>16</postgres.version>
+        <protobuf-maven-plugin.version>0.6.1</protobuf-maven-plugin.version>
+        <testcontainers-jooq-codegen-maven-plugin.version>0.0.4</testcontainers-jooq-codegen-maven-plugin.version>
+    </properties>
+
+    <dependencies>
+        <!-- internal -->
+        <dependency>
+            <groupId>dev.maynestream.ledgify</groupId>
+            <artifactId>ledgify-grpc-service-common</artifactId>
+            <version>${ledgify-grpc-service-common.version}</version>
+        </dependency>
+
+        <!-- Spring -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-actuator</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-validation</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-jooq</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-devtools</artifactId>
+            <scope>runtime</scope>
+            <optional>true</optional>
+        </dependency>
+
+        <!-- gRPC support -->
+        <dependency>
+            <groupId>net.devh</groupId>
+            <artifactId>grpc-server-spring-boot-starter</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.grpc</groupId>
+            <artifactId>grpc-netty</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>javax.annotation</groupId>
+            <artifactId>javax.annotation-api</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>build.buf</groupId>
+            <artifactId>protovalidate</artifactId>
+        </dependency>
+
+        <!-- 3rd-party -->
+        <dependency>
+            <groupId>io.micrometer</groupId>
+            <artifactId>micrometer-tracing-bridge-brave</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.micrometer</groupId>
+            <artifactId>micrometer-registry-prometheus</artifactId>
+            <scope>runtime</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.postgresql</groupId>
+            <artifactId>postgresql</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.jooq</groupId>
+            <artifactId>jooq</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.flywaydb</groupId>
+            <artifactId>flyway-core</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.flywaydb</groupId>
+            <artifactId>flyway-database-postgresql</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <optional>true</optional>
+        </dependency>
+
+        <!-- test -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-testcontainers</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>postgresql</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.asarkar.grpc</groupId>
+            <artifactId>grpc-test</artifactId>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.xolstice.maven.plugins</groupId>
+                <artifactId>protobuf-maven-plugin</artifactId>
+                <version>${protobuf-maven-plugin.version}</version>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>compile</goal>
+                            <goal>compile-custom</goal>
+                        </goals>
+                    </execution>
+                </executions>
+                <configuration>
+                    <pluginId>grpc-java</pluginId>
+                    <!--suppress UnresolvedMavenProperty -->
+                    <protocArtifact>com.google.protobuf:protoc:3.25.1:exe:${os.detected.classifier}</protocArtifact>
+                    <!--suppress UnresolvedMavenProperty -->
+                    <pluginArtifact>io.grpc:protoc-gen-grpc-java:${grpc.version}:exe:${os.detected.classifier}</pluginArtifact>
+                </configuration>
+            </plugin>
+            <plugin>
+                <groupId>org.testcontainers</groupId>
+                <artifactId>testcontainers-jooq-codegen-maven-plugin</artifactId>
+                <version>${testcontainers-jooq-codegen-maven-plugin.version}</version>
+                <executions>
+                    <execution>
+                        <id>generate-jooq-sources</id>
+                        <goals>
+                            <goal>generate</goal>
+                        </goals>
+                        <phase>generate-sources</phase>
+                        <configuration>
+                            <database>
+                                <type>POSTGRES</type>
+                                <containerImage>postgres:${postgres.version}</containerImage>
+                            </database>
+                            <flyway />
+                            <jooq>
+                                <generator>
+                                    <database>
+                                        <includes>.*</includes>
+                                        <excludes>flyway_schema_history</excludes>
+                                        <inputSchema>public</inputSchema>
+                                    </database>
+                                    <target>
+                                        <packageName>dev.maynestream.ledgify.account</packageName>
+                                        <directory>target/generated-sources/jooq</directory>
+                                    </target>
+                                </generator>
+                            </jooq>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+                <configuration>
+                    <excludes>
+                        <exclude>
+                            <groupId>org.projectlombok</groupId>
+                            <artifactId>lombok</artifactId>
+                        </exclude>
+                    </excludes>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
+</project>

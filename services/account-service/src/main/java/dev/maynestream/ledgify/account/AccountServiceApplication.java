@@ -1,7 +1,9 @@
 package dev.maynestream.ledgify.account;
 
+import dev.maynestream.ledgify.error.GrpcExceptionAdvice;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.context.annotation.Bean;
 
 @SpringBootApplication
 public class AccountServiceApplication {
@@ -10,5 +12,9 @@ public class AccountServiceApplication {
 		SpringApplication.run(AccountServiceApplication.class, args);
 	}
 
+	@Bean
+	GrpcExceptionAdvice grpcExceptionAdvice() {
+		return new GrpcExceptionAdvice();
+	}
 }
 

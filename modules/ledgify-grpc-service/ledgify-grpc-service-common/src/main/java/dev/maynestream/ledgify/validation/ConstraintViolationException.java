@@ -1,4 +1,4 @@
-package dev.maynestream.ledgify.account;
+package dev.maynestream.ledgify.validation;
 
 import build.buf.protovalidate.exceptions.ValidationException;
 import build.buf.validate.Violation;
