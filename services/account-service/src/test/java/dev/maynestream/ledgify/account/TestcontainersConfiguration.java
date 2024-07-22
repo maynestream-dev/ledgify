@@ -13,6 +13,6 @@ class TestcontainersConfiguration {
     @RestartScope
     @ServiceConnection
     public PostgreSQLContainer<?> postgreSQLContainer() {
-        return new PostgreSQLContainer<>("postgres");
+        return new PostgreSQLContainer<>("postgres:15");
     }
 }

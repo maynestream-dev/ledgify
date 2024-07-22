@@ -8,8 +8,7 @@ import "buf/validate/validate.proto";
 
 service Account {
   rpc CreateAccount(CreateAccountRequest) returns (CreateAccountResponse);
-  rpc CreditAccount(BalanceAdjustment) returns (AccountBalance);
-  rpc DebitAccount(BalanceAdjustment) returns (AccountBalance);
+  rpc ListAccounts(ListAccountsRequest) returns (ListAccountsResponse);
 }
 
 message CreateAccountRequest {
@@ -19,16 +18,21 @@ message CreateAccountRequest {
 }
 
 message CreateAccountResponse {
-  string id = 1 [(buf.validate.field).string.uuid = true];
+  string account_id = 1 [(buf.validate.field).string.uuid = true];
 }
 
-message BalanceAdjustment {
-  string account_id = 1 [(buf.validate.field).string.uuid = true];
-  string amount = 2 [(buf.validate.field) = { string: { pattern: "^[\\d]+[\\.]?[\\d]*$" }, ignore_empty: false }];
+message ListAccountsRequest {
+  string customer_id = 1 [(buf.validate.field).string.uuid = true];
 }
 
-message AccountBalance {
-  string account_id = 1 [(buf.validate.field).string.uuid = true];
-  string currency = 3 [(buf.validate.field).string.len = 3];
-  string balance = 2 [(buf.validate.field) = { string: { pattern: "^[\\d]+[\\.]?[\\d]*$" }, ignore_empty: false }];
+message ListAccountsResponse {
+  message Account {
+    string account_id = 1 [(buf.validate.field).string.uuid = true];
+    int32 ledger_id = 2 [(buf.validate.field).int32.gt = 0];
+    string currency = 3 [(buf.validate.field).string.len = 3];
+    string balance = 4 [(buf.validate.field) = {string: {pattern: "^[\\d]+[\\.]?[\\d]*$"}, ignore_empty: false}];
+  }
+
+  string customer_id = 1 [(buf.validate.field).string.uuid = true];
+  repeated Account accounts = 2;
 }

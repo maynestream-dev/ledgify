@@ -4,11 +4,13 @@ import build.buf.protovalidate.exceptions.ValidationException;
 import build.buf.validate.Violation;
 import dev.maynestream.ledgify.validation.ConstraintViolationException;
 import io.grpc.Status;
+import lombok.extern.slf4j.Slf4j;
 import net.devh.boot.grpc.server.advice.GrpcAdvice;
 import net.devh.boot.grpc.server.advice.GrpcExceptionHandler;
 import org.jooq.exception.NoDataFoundException;
 import org.springframework.dao.DataIntegrityViolationException;
 
+@Slf4j
 @GrpcAdvice
 public class GrpcExceptionAdvice {
 
@@ -46,6 +48,7 @@ public class GrpcExceptionAdvice {
 
     @GrpcExceptionHandler(Throwable.class)
     public Status handleThrowable(Throwable e) {
+        log.error("Unhandled exception", e);
         return Status.UNKNOWN.withDescription("Could not handle request").withCause(e);
     }
 }
