@@ -5,8 +5,8 @@ import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 import net.devh.boot.grpc.server.service.GrpcService;
 import org.apache.bookkeeper.client.BookKeeper;
+import org.apache.bookkeeper.client.LedgerHandle;
 import org.apache.bookkeeper.client.api.DigestType;
-import org.apache.bookkeeper.client.api.ReadHandle;
 import org.apache.bookkeeper.client.api.WriteHandle;
 
 import java.util.Map;
@@ -52,14 +52,12 @@ class LedgerService extends LedgerGrpc.LedgerImplBase {
     public void appendEntry(LedgerEntryRequest request, StreamObserver<LedgerEntryResponse> responseObserver) {
         validate(request);
 
-        final ReadHandle readHandle = bookKeeper.newOpenLedgerOp()
-                                                .withDigestType(DigestType.DUMMY)
-                                                .withPassword("password".getBytes()) // TODO obviously this isn't ideal
-                                                .withLedgerId(request.getLedgerId())
-                                                .execute()
-                                                .get();
+        final LedgerHandle ledgerHandle = bookKeeper.openLedger(request.getLedgerId(),
+                                                                BookKeeper.DigestType.DUMMY,
+                                                                "password".getBytes());
+        final long ledgerEntryId = ledgerHandle.addEntry(request.toByteArray());
         final LedgerEntryResponse response = LedgerEntryResponse.newBuilder()
-                                                                .setLedgerEntryId(readHandle.getId())
+                                                                .setLedgerEntryId(ledgerEntryId)
                                                                 .build();
 
         responseObserver.onNext(response);

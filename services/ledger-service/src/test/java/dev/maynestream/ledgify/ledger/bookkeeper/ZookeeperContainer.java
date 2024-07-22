@@ -5,6 +5,9 @@ import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.wait.strategy.LogMessageWaitStrategy;
 import org.testcontainers.utility.DockerImageName;
 
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
+
 @Slf4j
 public class ZookeeperContainer extends GenericContainer<ZookeeperContainer> {
 
@@ -20,19 +23,28 @@ public class ZookeeperContainer extends GenericContainer<ZookeeperContainer> {
         super(DEFAULT_IMAGE_NAME);
 
         this.withEnv("ZOO_MY_ID", String.valueOf(id))
-            .withEnv("ZOO_SERVERS",
-                     "server.1=zookeeper-1:2888:3888;2181 server.2=zookeeper-2:2888:3888;2181 server.3=zookeeper-3:2888:3888;2181")
-            .withEnv("ZOO_STANDALONE_ENABLED", "false")
-            .withEnv("ZOO_INIT_LIMIT", "10")
-            .withEnv("ZOO_SYNC_LIMIT", "5")
-            .withStartupAttempts(2);
+            .withEnv("ZOO_SERVERS", asServers(clusterSize))
+            .withEnv("ZOO_STANDALONE_ENABLED", "false");
 
-        setWaitStrategy(new LogMessageWaitStrategy().withRegEx(".*Started AdminServer.*"));
+        this.withNetworkAliases(asHostname(id));
 
         this.withExposedPorts(ZOOKEEPER_CLIENT_PORT,
                               ZOOKEEPER_FOLLOWER_PORT,
                               ZOOKEEPER_SERVER_PORT,
-                              ZOOKEEPER_HTTP_PORT)
-            .withLogConsumer(c -> log.info(c.getUtf8StringWithoutLineEnding()));
+                              ZOOKEEPER_HTTP_PORT);
+
+        this.withLogConsumer(c -> log.info(c.getUtf8StringWithoutLineEnding()));
+
+        setWaitStrategy(new LogMessageWaitStrategy().withRegEx(".*Started AdminServer.*"));
+    }
+
+    private static String asServers(int clusterSize) {
+        return IntStream.rangeClosed(1, clusterSize)
+                        .mapToObj(id -> "server.%d=%s:%d:%d;%d".formatted(id, asHostname(id), ZOOKEEPER_FOLLOWER_PORT, ZOOKEEPER_SERVER_PORT, ZOOKEEPER_CLIENT_PORT))
+                        .collect(Collectors.joining(" "));
+    }
+
+    private static String asHostname(final int id) {
+        return "%s-%d".formatted(ZOOKEEPER_HOST, id);
     }
 }

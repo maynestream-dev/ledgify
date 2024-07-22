@@ -8,7 +8,6 @@ import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.DependsOn;
 
 import java.io.IOException;
 
@@ -26,7 +25,6 @@ public class LedgerServiceApplication {
     }
 
     @Bean
-    @DependsOn("bookkeeperCluster")
     BookKeeper bkClient(BookkeeperConfiguration bookkeeperConfiguration) throws BKException, IOException, InterruptedException {
         final ClientConfiguration config = new ClientConfiguration().enableBookieHealthCheck();
         config.setZkServers(bookkeeperConfiguration.getZkServers());
