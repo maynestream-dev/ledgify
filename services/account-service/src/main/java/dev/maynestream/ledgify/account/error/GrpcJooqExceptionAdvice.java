@@ -2,9 +2,11 @@ package dev.maynestream.ledgify.account.error;
 
 import dev.maynestream.ledgify.error.GrpcExceptionAdvice;
 import io.grpc.Status;
+import net.devh.boot.grpc.server.advice.GrpcAdvice;
 import net.devh.boot.grpc.server.advice.GrpcExceptionHandler;
 import org.jooq.exception.NoDataFoundException;
 
+@GrpcAdvice
 public class GrpcJooqExceptionAdvice extends GrpcExceptionAdvice {
 
     @GrpcExceptionHandler(NoDataFoundException.class)
