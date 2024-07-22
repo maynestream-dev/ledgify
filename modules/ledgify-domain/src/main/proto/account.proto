@@ -6,14 +6,13 @@ option java_outer_classname = "AccountProto";
 
 import "buf/validate/validate.proto";
 
-service Account {
+service AccountManager {
   rpc CreateAccount(CreateAccountRequest) returns (CreateAccountResponse);
   rpc ListAccounts(ListAccountsRequest) returns (ListAccountsResponse);
 }
 
 message CreateAccountRequest {
   string customer_id = 1 [(buf.validate.field).string.uuid = true];
-  int64 ledger_id = 2 [(buf.validate.field).int64.gt = 0];
   string currency = 3 [(buf.validate.field).string.len = 3];
 }
 
@@ -28,9 +27,9 @@ message ListAccountsRequest {
 message ListAccountsResponse {
   message Account {
     string account_id = 1 [(buf.validate.field).string.uuid = true];
-    int64 ledger_id = 2 [(buf.validate.field).int64.gt = 0];
-    string currency = 3 [(buf.validate.field).string.len = 3];
-    string balance = 4 [(buf.validate.field) = {string: {pattern: "^[\\d]+[\\.]?[\\d]*$"}, ignore_empty: false}];
+    string currency = 2 [(buf.validate.field).string.len = 3];
+    string available_balance = 3 [(buf.validate.field) = {string: {pattern: "^[\\d]+[\\.]?[\\d]*$"}, ignore_empty: false}];
+    string ledger_balance = 4 [(buf.validate.field) = {string: {pattern: "^[\\d]+[\\.]?[\\d]*$"}, ignore_empty: false}];
   }
 
   string customer_id = 1 [(buf.validate.field).string.uuid = true];

@@ -18,10 +18,9 @@ public class AccountRepository {
         this.dsl = dsl;
     }
 
-    public AccountRecord createAccount(UUID customerId, Long ledgerId, Currency currency) {
+    public AccountRecord createAccount(UUID customerId, Currency currency) {
         return dsl.insertInto(Account.ACCOUNT)
                 .set(Account.ACCOUNT.CUSTOMER_ID, customerId)
-                .set(Account.ACCOUNT.LEDGER_ID, ledgerId)
                 .set(Account.ACCOUNT.CURRENCY, currency.getCurrencyCode())
                 .returning()
                 .fetchOne();

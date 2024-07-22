@@ -5,62 +5,48 @@ option java_package = "dev.maynestream.ledgify.transaction";
 option java_outer_classname = "TransactionProto";
 
 import "buf/validate/validate.proto";
-import "google/protobuf/empty.proto";
 
-service Transaction {
-  rpc SubmitTransaction(TransactionDetails) returns (TransactionStatus);
-  rpc CompleteTransaction(TransactionEvent) returns (TransactionStatus);
-  rpc FailTransaction(TransactionEvent) returns (TransactionStatus);
-  rpc ListTransactions(google.protobuf.Empty) returns (ListTransactionsResponse);
-}
+service TransactionLog {
+  rpc SubmitTransaction(TransactionDetails) returns (Transaction);
+  rpc CommitTransaction(TransactionCommit) returns (Transaction);
 
-message AccountBalance {
-  string account_id = 1 [(buf.validate.field).string.uuid = true];
-  string currency = 3 [(buf.validate.field).string.len = 3];
-  string balance = 2 [(buf.validate.field) = {string: {pattern: "^[\\d]+[\\.]?[\\d]*$"}, ignore_empty: false}];
-}
-
-message BalanceAdjustment {
-  string account_id = 1 [(buf.validate.field).string.uuid = true];
-  int64 ledger_entry_id = 2 [(buf.validate.field).int64.gt = 0];
+  rpc ListTransactions(ListTransactionsRequest) returns (ListTransactionsResponse);
 }
 
 message TransactionDetails {
   string description = 1 [(buf.validate.field).required = false, (buf.validate.field).string.max_len = 1000];
   string currency = 2 [(buf.validate.field).string.len = 3];
   string amount = 3 [(buf.validate.field) = {string: {pattern: "^[\\d]+[\\.]?[\\d]*$"}, ignore_empty: false}];
-  BalanceAdjustment debit = 4 [(buf.validate.field).required = true];
-  BalanceAdjustment credit = 5 [(buf.validate.field).required = true];
+  string debit_account_id = 4 [(buf.validate.field).string.uuid = true];
+  string credit_account_id = 5 [(buf.validate.field).string.uuid = true];
 }
 
-enum TransactionState {
+enum TransactionCommitStatus {
   PENDING = 0;
   COMPLETED = 1;
   FAILED = 2;
 }
 
-message TransactionStatus {
+message TransactionCommit {
   string transaction_id = 1 [(buf.validate.field).string.uuid = true];
-  TransactionState state = 2 [(buf.validate.field).required = true];
-  string state_context = 3 [(buf.validate.field).required = false, (buf.validate.field).string.max_len = 1000];
+  TransactionCommitState state = 2 [(buf.validate.field).required = true];
 }
 
-message TransactionEvent {
+message TransactionCommitState {
+  TransactionCommitStatus status = 1 [(buf.validate.field).required = true];
+  string context = 2 [(buf.validate.field).required = false, (buf.validate.field).string.max_len = 1000];
+}
+
+message Transaction {
   string transaction_id = 1 [(buf.validate.field).string.uuid = true];
-  string state_context = 2 [(buf.validate.field).required = false, (buf.validate.field).string.max_len = 1000];
+  TransactionDetails details = 2 [(buf.validate.field).required = true];
+  TransactionCommitState commit_state = 3 [(buf.validate.field).required = true];
+}
+
+message ListTransactionsRequest {
+  string account_id = 1 [(buf.validate.field).required = false, (buf.validate.field).string.uuid = true];
 }
 
 message ListTransactionsResponse {
-  message Transaction {
-    string transaction_id = 1 [(buf.validate.field).string.uuid = true];
-    string description = 2 [(buf.validate.field).required = false, (buf.validate.field).string.max_len = 1000];
-    string currency = 3 [(buf.validate.field).string.len = 3];
-    string amount = 4 [(buf.validate.field) = {string: {pattern: "^[\\d]+[\\.]?[\\d]*$"}, ignore_empty: false}];
-    BalanceAdjustment credit = 5 [(buf.validate.field).required = true];
-    BalanceAdjustment debit = 6 [(buf.validate.field).required = true];
-    TransactionState state = 7 [(buf.validate.field).required = true];
-    string state_context = 8 [(buf.validate.field).required = false, (buf.validate.field).string.max_len = 1000];
-  }
-
   repeated Transaction transactions = 1;
 }

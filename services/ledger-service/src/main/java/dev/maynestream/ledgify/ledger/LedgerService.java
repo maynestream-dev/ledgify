@@ -1,11 +1,12 @@
 package dev.maynestream.ledgify.ledger;
 
+import com.google.protobuf.Empty;
+import dev.maynestream.ledgify.transaction.Transaction;
 import io.grpc.stub.StreamObserver;
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 import net.devh.boot.grpc.server.service.GrpcService;
 import org.apache.bookkeeper.client.BookKeeper;
-import org.apache.bookkeeper.client.LedgerHandle;
 import org.apache.bookkeeper.client.api.DigestType;
 import org.apache.bookkeeper.client.api.WriteHandle;
 
@@ -27,7 +28,7 @@ class LedgerService extends LedgerGrpc.LedgerImplBase {
 
     @Override
     @SneakyThrows
-    public void createLedger(CreateLedgerRequest request, StreamObserver<CreateLedgerResponse> responseObserver) {
+    public void commitTransaction(Transaction request, StreamObserver<Empty> responseObserver) {
         validate(request);
 
         final WriteHandle ledger = bookKeeper.newCreateLedgerOp()
@@ -39,28 +40,8 @@ class LedgerService extends LedgerGrpc.LedgerImplBase {
                                              .withCustomMetadata(Map.of("account", request.toByteArray()))
                                              .execute()
                                              .get();
-        final CreateLedgerResponse response = CreateLedgerResponse.newBuilder()
-                                                                  .setLedgerId(ledger.getId())
-                                                                  .build();
 
-        responseObserver.onNext(response);
-        responseObserver.onCompleted();
-    }
-
-    @Override
-    @SneakyThrows
-    public void appendEntry(LedgerEntryRequest request, StreamObserver<LedgerEntryResponse> responseObserver) {
-        validate(request);
-
-        final LedgerHandle ledgerHandle = bookKeeper.openLedger(request.getLedgerId(),
-                                                                BookKeeper.DigestType.DUMMY,
-                                                                "password".getBytes());
-        final long ledgerEntryId = ledgerHandle.addEntry(request.toByteArray());
-        final LedgerEntryResponse response = LedgerEntryResponse.newBuilder()
-                                                                .setLedgerEntryId(ledgerEntryId)
-                                                                .build();
-
-        responseObserver.onNext(response);
+        responseObserver.onNext(Empty.getDefaultInstance());
         responseObserver.onCompleted();
     }
 }

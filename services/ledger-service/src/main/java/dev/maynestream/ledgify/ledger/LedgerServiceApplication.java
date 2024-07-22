@@ -1,5 +1,6 @@
 package dev.maynestream.ledgify.ledger;
 
+import dev.maynestream.ledgify.error.GrpcExceptionAdvice;
 import dev.maynestream.ledgify.ledger.error.GrpcLedgerExceptionAdvice;
 import org.apache.bookkeeper.client.BKException;
 import org.apache.bookkeeper.client.BookKeeper;
@@ -20,7 +21,12 @@ public class LedgerServiceApplication {
     }
 
     @Bean
-    GrpcLedgerExceptionAdvice grpcExceptionAdvice() {
+    GrpcExceptionAdvice grpcExceptionAdvice() {
+        return new GrpcExceptionAdvice();
+    }
+
+    @Bean
+    GrpcLedgerExceptionAdvice grpcLedgerExceptionAdvice() {
         return new GrpcLedgerExceptionAdvice();
     }
 

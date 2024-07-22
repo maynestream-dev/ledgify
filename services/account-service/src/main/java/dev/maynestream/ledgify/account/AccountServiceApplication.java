@@ -1,6 +1,7 @@
 package dev.maynestream.ledgify.account;
 
 import dev.maynestream.ledgify.account.error.GrpcJooqExceptionAdvice;
+import dev.maynestream.ledgify.error.GrpcExceptionAdvice;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.context.annotation.Bean;
@@ -16,7 +17,12 @@ public class AccountServiceApplication {
     }
 
     @Bean
-    GrpcJooqExceptionAdvice grpcExceptionAdvice() {
+    GrpcExceptionAdvice grpcExceptionAdvice() {
+        return new GrpcExceptionAdvice();
+    }
+
+    @Bean
+    GrpcJooqExceptionAdvice grpcJooqExceptionAdvice() {
         return new GrpcJooqExceptionAdvice();
     }
 }

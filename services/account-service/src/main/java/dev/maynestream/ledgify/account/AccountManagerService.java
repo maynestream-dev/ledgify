@@ -17,11 +17,11 @@ import static dev.maynestream.ledgify.validation.ValidationService.validate;
 
 @Slf4j
 @GrpcService
-class AccountService extends AccountGrpc.AccountImplBase {
+class AccountManagerService extends AccountManagerGrpc.AccountManagerImplBase {
 
     private final AccountRepository accountRepository;
 
-    public AccountService(AccountRepository accountRepository) {
+    public AccountManagerService(AccountRepository accountRepository) {
         this.accountRepository = accountRepository;
     }
 
@@ -32,7 +32,6 @@ class AccountService extends AccountGrpc.AccountImplBase {
 
         final Currency currency = getCurrency(request.getCurrency());
         final AccountRecord account = accountRepository.createAccount(getCustomerId(request.getCustomerId()),
-                                                                      request.getLedgerId(),
                                                                       currency);
         final CreateAccountResponse response = CreateAccountResponse.newBuilder()
                                                                     .setAccountId(account.getId().toString())
@@ -50,7 +49,7 @@ class AccountService extends AccountGrpc.AccountImplBase {
         final Collection<AccountRecord> accounts = accountRepository.listAccounts(getCustomerId(request.getCustomerId()));
         final ListAccountsResponse response = ListAccountsResponse.newBuilder()
                                                                   .addAllAccounts(accounts.stream()
-                                                                                          .map(AccountService::mapAccount)
+                                                                                          .map(AccountManagerService::mapAccount)
                                                                                           .toList())
                                                                   .setCustomerId(request.getCustomerId())
                                                                   .build();
@@ -59,12 +58,12 @@ class AccountService extends AccountGrpc.AccountImplBase {
         responseObserver.onCompleted();
     }
 
-    private static ListAccountsResponse.Account mapAccount(AccountRecord accountR) {
+    private static ListAccountsResponse.Account mapAccount(AccountRecord account) {
         return ListAccountsResponse.Account.newBuilder()
-                                           .setAccountId(accountR.getId().toString())
-                                           .setLedgerId(accountR.getLedgerId())
-                                           .setCurrency(accountR.getCurrency())
-                                           .setBalance(convertBigDecimal(accountR.getBalance()))
+                                           .setAccountId(account.getId().toString())
+                                           .setCurrency(account.getCurrency())
+                                           .setAvailableBalance(convertBigDecimal(account.getAvailableBalance()))
+                                           .setLedgerBalance(convertBigDecimal(account.getLedgerBalance()))
                                            .build();
     }
 

@@ -2,14 +2,14 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
 CREATE TABLE account
 (
-    id          UUID       NOT NULL PRIMARY KEY DEFAULT uuid_generate_v1(),
-    customer_id UUID       NOT NULL,
-    ledger_id   BIGINT     NOT NULL,
-    currency    VARCHAR(3) NOT NULL,
-    balance     NUMERIC    NOT NULL             DEFAULT 0,
-    created     TIMESTAMP  NOT NULL             DEFAULT now(),
-    updated     TIMESTAMP  NOT NULL             DEFAULT now(),
-    version     INTEGER    NOT NULL             DEFAULT 1,
+    id                UUID       NOT NULL PRIMARY KEY DEFAULT uuid_generate_v1(),
+    customer_id       UUID       NOT NULL,
+    currency          VARCHAR(3) NOT NULL,
+    available_balance NUMERIC    NOT NULL             DEFAULT 0,
+    ledger_balance    NUMERIC    NOT NULL             DEFAULT 0,
+    created           TIMESTAMP  NOT NULL             DEFAULT now(),
+    updated           TIMESTAMP  NOT NULL             DEFAULT now(),
+    version           INTEGER    NOT NULL             DEFAULT 1,
 
     CONSTRAINT customer_currency_unique UNIQUE (customer_id, currency)
 );
@@ -20,8 +20,6 @@ CREATE TABLE transaction
     description            VARCHAR(1000),
     debit_account_id       UUID           NOT NULL,
     credit_account_id      UUID           NOT NULL,
-    debit_ledger_entry_id  BIGINT         NOT NULL,
-    credit_ledger_entry_id BIGINT         NOT NULL,
     currency               VARCHAR(3)     NOT NULL,
     amount                 numeric(15, 6) NOT NULL CHECK (amount > 0),
     state                  VARCHAR(20)    NOT NULL             DEFAULT 'PENDING' CHECK (state IN ('PENDING', 'COMPLETED', 'FAILED')),
@@ -33,9 +31,7 @@ CREATE TABLE transaction
     CONSTRAINT fk_debit_account_id FOREIGN KEY (debit_account_id) REFERENCES account (id)
         ON DELETE RESTRICT,
     CONSTRAINT fk_credit_account_id FOREIGN KEY (credit_account_id) REFERENCES account (id)
-        ON DELETE RESTRICT,
-    CONSTRAINT debit_ledger_entry_id_unique UNIQUE (debit_ledger_entry_id),
-    CONSTRAINT credit_ledger_entry_id_unique UNIQUE (credit_ledger_entry_id)
+        ON DELETE RESTRICT
 );
 
 CREATE FUNCTION on_entity_update()
@@ -109,16 +105,40 @@ CREATE TRIGGER transaction_finalised
     WHEN (OLD.state != 'PENDING')
 EXECUTE PROCEDURE on_attempt_modify_complete_transaction();
 
-CREATE FUNCTION on_transaction_complete()
+CREATE FUNCTION update_available_balances()
     RETURNS TRIGGER AS
 $$
 BEGIN
     UPDATE account
-    SET balance = balance - OLD.amount
+    SET available_balance = available_balance - OLD.amount
     WHERE account.id = OLD.debit_account_id;
 
     UPDATE account
-    SET balance = balance + OLD.amount
+    SET available_balance = available_balance + OLD.amount
+    WHERE account.id = OLD.credit_account_id;
+
+    RETURN NEW;
+END;
+$$
+    language 'plpgsql';
+
+CREATE TRIGGER transaction_submitted
+    AFTER INSERT
+    ON
+        transaction
+    FOR EACH ROW
+EXECUTE PROCEDURE update_available_balances();
+
+CREATE FUNCTION update_ledger_balances()
+    RETURNS TRIGGER AS
+$$
+BEGIN
+    UPDATE account
+    SET ledger_balance = ledger_balance - OLD.amount
+    WHERE account.id = OLD.debit_account_id;
+
+    UPDATE account
+    SET ledger_balance = ledger_balance + OLD.amount
     WHERE account.id = OLD.credit_account_id;
 
     RETURN NEW;
@@ -132,4 +152,4 @@ CREATE TRIGGER transaction_completed
         transaction
     FOR EACH ROW
     WHEN (OLD.state IS DISTINCT FROM NEW.state AND NEW.state = 'COMPLETED')
-EXECUTE PROCEDURE on_transaction_complete();
+EXECUTE PROCEDURE update_ledger_balances();

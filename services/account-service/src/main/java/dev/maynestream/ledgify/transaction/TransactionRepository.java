@@ -19,13 +19,11 @@ public class TransactionRepository {
         this.dsl = dsl;
     }
 
-    public TransactionRecord submitTransaction(String description, UUID debitAccountId, UUID creditAccountId, Long debitLedgerEntryId, Long creditLedgerEntryId, Currency currency, BigDecimal amount) {
+    public TransactionRecord submitTransaction(String description, UUID debitAccountId, UUID creditAccountId, Currency currency, BigDecimal amount) {
         return dsl.insertInto(Transaction.TRANSACTION)
                   .set(Transaction.TRANSACTION.DESCRIPTION, description)
                   .set(Transaction.TRANSACTION.DEBIT_ACCOUNT_ID, debitAccountId)
                   .set(Transaction.TRANSACTION.CREDIT_ACCOUNT_ID, creditAccountId)
-                  .set(Transaction.TRANSACTION.DEBIT_LEDGER_ENTRY_ID, debitLedgerEntryId)
-                  .set(Transaction.TRANSACTION.CREDIT_LEDGER_ENTRY_ID, creditLedgerEntryId)
                   .set(Transaction.TRANSACTION.CURRENCY, currency.getCurrencyCode())
                   .set(Transaction.TRANSACTION.AMOUNT, amount)
                   .returning()
@@ -41,7 +39,7 @@ public class TransactionRepository {
                   .fetchOne();
     }
 
-    public Collection<TransactionRecord> listTransactions() {
+    public Collection<TransactionRecord> listTransactions(final UUID accountId) {
         return dsl.select()
                   .from(Transaction.TRANSACTION)
                   .fetch()
