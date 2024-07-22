@@ -19,5 +19,6 @@
         <module>../../modules/ledgify-domain</module>
         <module>../../modules/ledgify-grpc-service</module>
         <module>../../services/account-service</module>
+        <module>../../services/ledger-service</module>
     </modules>
 </project>

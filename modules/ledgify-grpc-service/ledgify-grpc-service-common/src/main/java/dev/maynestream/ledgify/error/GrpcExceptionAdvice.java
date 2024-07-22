@@ -7,7 +7,6 @@ import io.grpc.Status;
 import lombok.extern.slf4j.Slf4j;
 import net.devh.boot.grpc.server.advice.GrpcAdvice;
 import net.devh.boot.grpc.server.advice.GrpcExceptionHandler;
-import org.jooq.exception.NoDataFoundException;
 import org.springframework.dao.DataIntegrityViolationException;
 
 @Slf4j
@@ -39,11 +38,6 @@ public class GrpcExceptionAdvice {
     @GrpcExceptionHandler(DataIntegrityViolationException.class)
     public Status handleDataIntegrityViolation(DataIntegrityViolationException e) {
         return Status.INVALID_ARGUMENT.withDescription("A validation exception occurred: " + e.getMostSpecificCause().getMessage()).withCause(e);
-    }
-
-    @GrpcExceptionHandler(NoDataFoundException.class)
-    public Status handleDataIntegrityViolation(NoDataFoundException e) {
-        return Status.NOT_FOUND.withDescription("Entity not found").withCause(e);
     }
 
     @GrpcExceptionHandler(Throwable.class)

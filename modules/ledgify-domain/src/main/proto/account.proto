@@ -13,7 +13,7 @@ service Account {
 
 message CreateAccountRequest {
   string customer_id = 1 [(buf.validate.field).string.uuid = true];
-  int32 ledger_id = 2 [(buf.validate.field).int32.gt = 0];
+  int64 ledger_id = 2 [(buf.validate.field).int64.gt = 0];
   string currency = 3 [(buf.validate.field).string.len = 3];
 }
 
@@ -28,7 +28,7 @@ message ListAccountsRequest {
 message ListAccountsResponse {
   message Account {
     string account_id = 1 [(buf.validate.field).string.uuid = true];
-    int32 ledger_id = 2 [(buf.validate.field).int32.gt = 0];
+    int64 ledger_id = 2 [(buf.validate.field).int64.gt = 0];
     string currency = 3 [(buf.validate.field).string.len = 3];
     string balance = 4 [(buf.validate.field) = {string: {pattern: "^[\\d]+[\\.]?[\\d]*$"}, ignore_empty: false}];
   }

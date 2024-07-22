@@ -22,7 +22,7 @@ message AccountBalance {
 
 message BalanceAdjustment {
   string account_id = 1 [(buf.validate.field).string.uuid = true];
-  int32 ledger_entry_id = 2 [(buf.validate.field).int32.gt = 0];
+  int64 ledger_entry_id = 2 [(buf.validate.field).int64.gt = 0];
 }
 
 message TransactionDetails {

@@ -1,0 +1,12 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="TestLedgerServiceApplication" type="SpringBootApplicationConfigurationType" factoryName="Spring Boot" nameIsGenerated="true">
+    <option name="FRAME_DEACTIVATION_UPDATE_POLICY" value="UpdateClassesAndResources" />
+    <module name="ledger-service" />
+    <option name="SPRING_BOOT_MAIN_CLASS" value="dev.maynestream.ledgify.ledger.TestLedgerServiceApplication" />
+    <method v="2">
+      <option name="Maven.BeforeRunTask" enabled="true" file="$PROJECT_DIR$/services/ledger-service/pom.xml" goal="clean" />
+      <option name="Maven.BeforeRunTask" enabled="true" file="$PROJECT_DIR$/modules/ledgify-domain/pom.xml" goal="protobuf:compile protobuf:compile-custom resources:resources compiler:compile" />
+      <option name="Make" enabled="true" />
+    </method>
+  </configuration>
+</component>

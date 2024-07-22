@@ -19,7 +19,7 @@ public class TransactionRepository {
         this.dsl = dsl;
     }
 
-    public TransactionRecord submitTransaction(String description, UUID debitAccountId, UUID creditAccountId, Integer debitLedgerEntryId, Integer creditLedgerEntryId, Currency currency, BigDecimal amount) {
+    public TransactionRecord submitTransaction(String description, UUID debitAccountId, UUID creditAccountId, Long debitLedgerEntryId, Long creditLedgerEntryId, Currency currency, BigDecimal amount) {
         return dsl.insertInto(Transaction.TRANSACTION)
                   .set(Transaction.TRANSACTION.DESCRIPTION, description)
                   .set(Transaction.TRANSACTION.DEBIT_ACCOUNT_ID, debitAccountId)
