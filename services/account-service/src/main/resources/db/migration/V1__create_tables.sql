@@ -22,7 +22,7 @@ CREATE TABLE transaction
     credit_account_id      UUID           NOT NULL,
     currency               VARCHAR(3)     NOT NULL,
     amount                 numeric(15, 6) NOT NULL CHECK (amount > 0),
-    state                  VARCHAR(20)    NOT NULL             DEFAULT 'PENDING' CHECK (state IN ('PENDING', 'COMPLETED', 'FAILED')),
+    state                  VARCHAR(20)    NOT NULL             DEFAULT 'PENDING' CHECK (state IN ('PENDING', 'COMPLETED', 'FAILED', 'UNKNOWN')),
     state_context          VARCHAR(1000),
     created                TIMESTAMP      NOT NULL             DEFAULT now(),
     updated                TIMESTAMP      NOT NULL             DEFAULT now(),
@@ -102,7 +102,7 @@ CREATE TRIGGER transaction_finalised
     ON
         transaction
     FOR EACH ROW
-    WHEN (OLD.state != 'PENDING')
+    WHEN (OLD.state IN ('COMPLETED', 'FAILED'))
 EXECUTE PROCEDURE on_attempt_modify_complete_transaction();
 
 CREATE FUNCTION update_available_balances()
