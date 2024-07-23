@@ -9,7 +9,9 @@ import org.springframework.context.annotation.Bean;
 import org.testcontainers.containers.Network;
 
 import java.util.Set;
-import java.util.stream.Collectors;
+
+import static dev.maynestream.ledgify.ledger.bookkeeper.BookkeeperContainer.BOOKKEEPER_ZK_PATH;
+import static dev.maynestream.ledgify.ledger.bookkeeper.ZookeeperContainer.ZOOKEEPER_CLIENT_PORT;
 
 @TestConfiguration(proxyBeanMethods = false)
 class TestcontainersConfiguration {
@@ -17,7 +19,6 @@ class TestcontainersConfiguration {
     private static final Network NETWORK = Network.newNetwork();
     private static final int ZOOKEEPER_CLUSTER_SIZE = 3;
     private static final int BOOKKEEPER_CLUSTER_SIZE = 3;
-    private static final String LOCALHOST = "localhost";
 
     @Bean
     @RestartScope
@@ -30,19 +31,19 @@ class TestcontainersConfiguration {
     @Bean
     @RestartScope
     public ContainerCluster<BookkeeperContainer> bookkeeperCluster(ContainerCluster<ZookeeperContainer> zookeeperCluster) {
-        //noinspection resource
         return ContainerCluster.using(BOOKKEEPER_CLUSTER_SIZE,
-                                      id -> new BookkeeperContainer(zookeeperCluster.getContainers()).withNetwork(NETWORK));
+                                      id -> new BookkeeperContainer(zookeeperCluster).withNetwork(NETWORK));
     }
 
     @Bean
     @RestartScope
     public BookkeeperConfiguration bookkeeperConfiguration(ContainerCluster<ZookeeperContainer> zookeeperCluster, ContainerCluster<BookkeeperContainer> bookkeeperCluster) {
-        final Set<String> zookeeperHosts = getZookeeperHosts(zookeeperCluster.getContainers());
+        final Set<String> zookeeperHosts = zookeeperCluster.getHostsAsExternal(ZOOKEEPER_CLIENT_PORT);
 
         final BookkeeperConfiguration bookkeeperConfiguration = new BookkeeperConfiguration();
         bookkeeperConfiguration.setZkServers(String.join(",", zookeeperHosts));
-        bookkeeperConfiguration.setMetadataServiceUri("zk+hierarchical://" + String.join(";", zookeeperHosts) + "/ledgers");
+        bookkeeperConfiguration.setMetadataServiceUri(ZookeeperContainer.formatMetadataServiceUri(zookeeperHosts,
+                                                                                                  BOOKKEEPER_ZK_PATH));
         if (bookkeeperCluster.getContainers().size() == 1) {
             bookkeeperConfiguration.setDefaultEnsembleSize(1);
             bookkeeperConfiguration.setDefaultWriteQuorumSize(1);
@@ -50,12 +51,4 @@ class TestcontainersConfiguration {
         }
         return bookkeeperConfiguration;
     }
-
-    private static Set<String> getZookeeperHosts(final Set<ZookeeperContainer> zookeeperContainers) {
-        return zookeeperContainers.stream()
-                                  .map(container -> container.getMappedPort(ZookeeperContainer.ZOOKEEPER_CLIENT_PORT))
-                                  .map(port -> "%s:%d".formatted(LOCALHOST, port))
-                                  .collect(Collectors.toSet());
-    }
-
 }

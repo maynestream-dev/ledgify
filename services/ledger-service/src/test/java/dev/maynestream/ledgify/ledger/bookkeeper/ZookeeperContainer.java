@@ -1,10 +1,12 @@
 package dev.maynestream.ledgify.ledger.bookkeeper;
 
 import lombok.extern.slf4j.Slf4j;
+import org.slf4j.event.Level;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.wait.strategy.LogMessageWaitStrategy;
 import org.testcontainers.utility.DockerImageName;
 
+import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
@@ -18,6 +20,8 @@ public class ZookeeperContainer extends GenericContainer<ZookeeperContainer> {
     public static final Integer ZOOKEEPER_FOLLOWER_PORT = 2888;
     public static final Integer ZOOKEEPER_SERVER_PORT = 3888;
     public static final Integer ZOOKEEPER_HTTP_PORT = 8080;
+
+    private Level level = Level.DEBUG;
 
     public ZookeeperContainer(final int id, final int clusterSize) {
         super(DEFAULT_IMAGE_NAME);
@@ -33,9 +37,14 @@ public class ZookeeperContainer extends GenericContainer<ZookeeperContainer> {
                               ZOOKEEPER_SERVER_PORT,
                               ZOOKEEPER_HTTP_PORT);
 
-        this.withLogConsumer(c -> log.info(c.getUtf8StringWithoutLineEnding()));
+        this.withLogConsumer(c -> log.atLevel(level).log(c.getUtf8StringWithoutLineEnding()));
 
-        setWaitStrategy(new LogMessageWaitStrategy().withRegEx(".*Started AdminServer.*"));
+        this.setWaitStrategy(new LogMessageWaitStrategy().withRegEx(".*Started AdminServer.*"));
+    }
+
+    public ZookeeperContainer withLogLevel(Level level) {
+        this.level = level;
+        return this;
     }
 
     private static String asServers(int clusterSize) {
@@ -46,5 +55,9 @@ public class ZookeeperContainer extends GenericContainer<ZookeeperContainer> {
 
     private static String asHostname(final int id) {
         return "%s-%d".formatted(ZOOKEEPER_HOST, id);
+    }
+
+    public static String formatMetadataServiceUri(Set<String> hosts, String path) {
+        return "zk+hierarchical://%s/%s".formatted(String.join(";", hosts), path);
     }
 }
