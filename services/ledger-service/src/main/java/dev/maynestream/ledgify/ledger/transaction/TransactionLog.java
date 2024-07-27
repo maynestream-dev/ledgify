@@ -5,6 +5,7 @@ import dev.maynestream.ledgify.transaction.TransactionCommitState;
 import dev.maynestream.ledgify.transaction.TransactionCommitStatus;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
+import org.slf4j.MDC;
 
 import java.util.Objects;
 import java.util.Set;
@@ -45,7 +46,7 @@ public class TransactionLog {
     TransactionCommitState submit(final Transaction transaction) throws InterruptedException {
         validateTransaction(transaction);
 
-        try {
+        try (final var ignore = accountMdc(); final var ignore2 = transactionMdc(transaction); ) {
             log.info("Submitting transaction {}", transaction.getTransactionId());
             if (submitted.offer(transaction, SUBMIT_TRANSACTION_TIMEOUT_SECS, TimeUnit.SECONDS)) {
                 log.info("Awaiting commit of submitted transaction {}", transaction.getTransactionId());
@@ -74,9 +75,11 @@ public class TransactionLog {
         final Transaction transaction = submitted.poll(AWAIT_TRANSACTION_TIMEOUT_SECS, TimeUnit.SECONDS);
 
         if (transaction != null) {
-            consumer.commit(transaction);
-            commits.put(transaction, System.currentTimeMillis());
-            latch.countDown();
+            try (final var ignore = accountMdc(); final var ignore2 = transactionMdc(transaction); ) {
+                consumer.commit(transaction);
+                commits.put(transaction, System.currentTimeMillis());
+                latch.countDown();
+            }
         }
     }
 
@@ -101,7 +104,16 @@ public class TransactionLog {
         return state;
     }
 
+    private MDC.MDCCloseable accountMdc() {
+        return MDC.putCloseable("account-id", accountId.toString());
+    }
+
+    private MDC.MDCCloseable transactionMdc(final Transaction transaction) {
+        return MDC.putCloseable("transaction-id", transaction.getTransactionId());
+    }
+
     interface CommitAction {
+
         void commit(Transaction transaction) throws Exception;
     }
 }
