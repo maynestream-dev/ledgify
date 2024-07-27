@@ -37,5 +37,4 @@ public class LedgerAccessor {
                                                           BookKeeper.DigestType.MAC,
                                                           ledgerPassword));
     }
-
 }

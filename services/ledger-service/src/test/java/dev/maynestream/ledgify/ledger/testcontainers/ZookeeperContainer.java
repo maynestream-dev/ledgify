@@ -28,7 +28,8 @@ public class ZookeeperContainer extends GenericContainer<ZookeeperContainer> {
 
         this.withEnv("ZOO_MY_ID", String.valueOf(id))
             .withEnv("ZOO_SERVERS", asServers(clusterSize))
-            .withEnv("ZOO_STANDALONE_ENABLED", "false");
+            .withEnv("ZOO_STANDALONE_ENABLED", "false")
+            .withEnv("ZOO_RECONFIG_ENABLED", "true");
 
         this.withNetworkAliases(asHostname(id));
 
@@ -58,6 +59,6 @@ public class ZookeeperContainer extends GenericContainer<ZookeeperContainer> {
     }
 
     public static String formatMetadataServiceUri(Set<String> hosts, String path) {
-        return "zk+hierarchical://%s/%s".formatted(String.join(";", hosts), path);
+        return "zk+null://%s/%s".formatted(String.join(";", hosts), path);
     }
 }

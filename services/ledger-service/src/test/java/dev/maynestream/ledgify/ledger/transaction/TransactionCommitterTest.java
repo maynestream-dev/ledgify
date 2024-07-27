@@ -13,13 +13,14 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
 
+import java.time.Duration;
 import java.time.LocalDate;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Stream;
 
 import static dev.maynestream.ledgify.CommonTestFixtures.randomId;
+import static org.awaitility.Awaitility.await;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.contains;
 
@@ -37,23 +38,26 @@ class TransactionCommitterTest {
     private CuratorFramework curator;
 
     @Test
-    public void testCommit() {
+    public void shouldMaintainOrderOfSerialCommits() {
+        // given
         final UUID accountId = randomId();
+        final int transactionCount = 10;
         final TransactionLog log = new TransactionLog(accountId);
+        final List<Transaction> expected = Stream.generate(() -> pendingTransactionForAccount(accountId))
+                                                 .limit(transactionCount)
+                                                 .toList();
 
-        final List<Transaction> expected = new ArrayList<>();
+        // when
         try (final TransactionCommitter committer = getCommitter(accountId, log);
              final TransactionCommitter follower = getCommitter(accountId, log)) {
             new Thread(committer).start();
             new Thread(follower).start();
-
-            Stream.generate(() -> pendingTransactionForAccount(accountId))
-                  .limit(10)
-                  .peek(expected::add)
-                  .forEach(t -> commit(log, t));
+            expected.forEach(t -> submit(log, t));
         }
+        await().atMost(Duration.ofSeconds(20)).until(() -> log.getCommits().size() == transactionCount);
 
-        assertThat(log.getCommits(), contains(expected));
+        // then
+        assertThat(log.getCommits(), contains(expected.toArray(new Transaction[0])));
     }
 
     private static Transaction pendingTransactionForAccount(final UUID accountId) {
@@ -73,7 +77,7 @@ class TransactionCommitterTest {
     }
 
     @SneakyThrows
-    private static void commit(final TransactionLog log, Transaction transaction) {
+    private static void submit(final TransactionLog log, Transaction transaction) {
         log.submit(transaction);
     }
 }

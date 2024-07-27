@@ -1,10 +1,13 @@
 package dev.maynestream.ledgify.ledger.commit;
 
+import lombok.ToString;
+
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 
+@ToString
 class LedgerCollection implements Iterable<Long> {
 
     static LedgerCollection fromBytes(byte[] bytes) {

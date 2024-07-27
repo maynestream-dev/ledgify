@@ -1,12 +1,14 @@
 package dev.maynestream.ledgify.ledger.commit;
 
 import dev.maynestream.ledgify.ledger.commit.Ledger.Entry;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.zookeeper.KeeperException;
 
 import java.util.Objects;
 import java.util.function.Consumer;
 import java.util.function.Function;
 
+@Slf4j
 public abstract class LedgerReader<T> {
     private static final int LEDGER_COMMIT_AWAIT_MILLIS = 1000;
 
@@ -30,9 +32,11 @@ public abstract class LedgerReader<T> {
     }
 
     public void readAll() throws Exception {
-        Entry<T> lasRecordedEntry = Entry.initial();
-        while (!Thread.interrupted()) {
-            lasRecordedEntry = readFrom(lasRecordedEntry);
+        Entry<T> lastRecordedEntry = Entry.initial();
+
+        log.info("Reading all entries from {}", lastRecordedEntry);
+        while (!Thread.interrupted() && !isLeader()) {
+            lastRecordedEntry = readFrom(lastRecordedEntry);
 
             Thread.sleep(LEDGER_COMMIT_AWAIT_MILLIS);
         }
@@ -53,18 +57,22 @@ public abstract class LedgerReader<T> {
         return lastRecordedEntry;
     }
 
-    private LedgerCollection awaitInitialLedgerCollection(final Entry entry) throws Exception {
+    private LedgerCollection awaitInitialLedgerCollection(final Entry<T> entry) throws Exception {
         LedgerCollection ledgers = null;
 
+        log.info("Waiting for initial ledger collection");
         // wait for leader to write
-        while (ledgers == null) {
+        while (!isLeader() && ledgers == null) {
             try {
                 ledgers = store.load();
+                log.debug("Loaded initial ledger collection {}", ledgers);
                 if (entry.exists()) { // only get ledgers that haven't been seen
                     ledgers = ledgers.since(entry.ledgerId());
+                    log.debug("Truncating initial ledger collection to {}", ledgers);
                 }
                 // on first load leader may not yet have created ledger collection
             } catch (KeeperException.NoNodeException nne) {
+                log.debug("No ledger collection found - awaiting initialization by leader");
                 Thread.sleep(1000);
             }
         }
@@ -73,31 +81,33 @@ public abstract class LedgerReader<T> {
 
     private Entry<T> consumeUnrecordedTransactionsAsFollower(Entry<T> lastRecordedEntry,
                                                              final LedgerCollection ledgers) throws Exception {
-        for (long previous : ledgers) {
-            long nextEntry = 0;
+        for (long ledgerId : ledgers) {
+            long startingEntry = 0;
             while (!isLeader()) {
                 // if the last recorded entry was part of this ledger, only read entries since then
-                if (lastRecordedEntry.ledgerId() == previous) {
-                    nextEntry = lastRecordedEntry.entryId() + 1;
+                if (lastRecordedEntry.ledgerId() == ledgerId) {
+                    startingEntry = lastRecordedEntry.entryId() + 1;
                 }
 
-                final Ledger ledger = accessor.openForRead(previous);
+                log.debug("Reading ledger {} to consume from entry {}", ledgerId, startingEntry);
+                final Ledger ledger = accessor.openForRead(ledgerId);
 
                 // if there are unread entries remaining on this ledger (according to the read-only handle)
-                if (nextEntry <= ledger.getLastRecordedEntryId()) {
+                if (startingEntry <= ledger.getLastRecordedEntryId()) {
                     // read and record the remaining entries in the ledger
-                    lastRecordedEntry = consumeEntries(ledger, lastRecordedEntry, nextEntry);
+                    lastRecordedEntry = consumeEntries(ledger, lastRecordedEntry, startingEntry);
                 }
 
                 // if this ledger is closed, eagerly progress to the next
                 if (ledger.isClosed()) {
+                    log.debug("Finished reading from closed ledger {}", ledgerId);
                     break;
                 }
 
+                log.debug("Awaiting new commits to open ledger {}", ledgerId);
                 // otherwise await some more entries
                 Thread.sleep(LEDGER_COMMIT_AWAIT_MILLIS);
             }
-
         }
 
         return lastRecordedEntry;

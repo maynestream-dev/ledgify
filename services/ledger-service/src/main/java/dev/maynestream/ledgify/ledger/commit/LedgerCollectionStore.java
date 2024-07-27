@@ -19,6 +19,7 @@ public class LedgerCollectionStore {
 
     void create(final Stat stat, final LedgerCollection ledgers) throws Exception {
         curator.create()
+               .creatingParentContainersIfNeeded()
                .storingStatIn(stat)
                .forPath(collectionPath, ledgers.toBytes());
     }

@@ -5,6 +5,8 @@ import dev.maynestream.ledgify.ledger.commit.Ledger.LedgerException;
 import lombok.SneakyThrows;
 import org.apache.zookeeper.KeeperException;
 import org.apache.zookeeper.data.Stat;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.Objects;
 import java.util.function.Consumer;
@@ -12,6 +14,7 @@ import java.util.function.Function;
 
 public abstract class LedgerCommitter<T> extends LedgerReader<T> implements AutoCloseable, Runnable {
 
+    private static final Logger log = LoggerFactory.getLogger(LedgerCommitter.class);
     private final NaiveLeaderFlag flag;
 
     protected LedgerCommitter(final LedgerAccessor accessor,
@@ -38,7 +41,7 @@ public abstract class LedgerCommitter<T> extends LedgerReader<T> implements Auto
     public void run() {
         Entry<T> lastDisplayedEntry = Entry.initial();
 
-        while (true) {
+        while (!Thread.interrupted()) {
             if (isLeader()) {
                 lastDisplayedEntry = lead(lastDisplayedEntry);
             } else {
@@ -56,6 +59,7 @@ public abstract class LedgerCommitter<T> extends LedgerReader<T> implements Auto
 
         final Stat stat = new Stat();
         final LedgerCollection ledgers = store.load(stat);
+        log.info("Loaded initial ledger collection {}", ledgers);
 
         try {
             lastRecordedEntry = consumeUnrecordedTransactionsAsLeader(lastRecordedEntry, ledgers);
@@ -63,7 +67,7 @@ public abstract class LedgerCommitter<T> extends LedgerReader<T> implements Auto
             final Ledger ledger = createNewLedger(stat, ledgers, lastRecordedEntry);
 
             try {
-                while (flag.isLeader()) {
+                while (isLeader()) {
                     // attempt to commit transactions
 
                     lastRecordedEntry = attemptCommit(ledger, lastRecordedEntry);
@@ -84,26 +88,29 @@ public abstract class LedgerCommitter<T> extends LedgerReader<T> implements Auto
     private Entry<T> consumeUnrecordedTransactionsAsLeader(Entry<T> lastRecordedEntry,
                                                            final LedgerCollection ledgers) throws Exception {
         final LedgerCollection missedLedgers = missedLedgers(lastRecordedEntry, ledgers);
+        log.info("Consuming entries from missed ledgers {}", missedLedgers);
 
-        long nextEntry = lastRecordedEntry.entryId() + 1;
+        long startingEntry = lastRecordedEntry.entryId() + 1;
 
-        for (Long previous : missedLedgers) {
+        for (Long ledgerId : missedLedgers) {
             //try to open the missed ledger
             Ledger ledger;
             try {
-                ledger = accessor.openAsLeader(previous);
+                log.debug("Reading ledger {} to consume from entry {}", ledgerId, startingEntry);
+                ledger = accessor.openAsLeader(ledgerId);
             } catch (Exception e) {
                 throw new LedgerException(lastRecordedEntry);
             }
 
             // reset and continue if the end of the ledger has been reached
-            if (nextEntry > ledger.getLastRecordedEntryId()) {
-                nextEntry = 0;
+            if (startingEntry > ledger.getLastRecordedEntryId()) {
+                log.debug("No remaining entries to consume from ledger {}", ledgerId);
+                startingEntry = 0;
                 continue;
             }
 
             // otherwise read and record the remaining entries in the ledger
-            lastRecordedEntry = consumeEntries(ledger, lastRecordedEntry, nextEntry);
+            lastRecordedEntry = consumeEntries(ledger, lastRecordedEntry, startingEntry);
         }
 
         return lastRecordedEntry;
@@ -111,14 +118,15 @@ public abstract class LedgerCommitter<T> extends LedgerReader<T> implements Auto
 
     private Ledger createNewLedger(final Stat stat,
                                    final LedgerCollection ledgers,
-                                   final Entry lastRecordedEntry) throws Exception {
+                                   final Entry<T> lastRecordedEntry) throws Exception {
         final Ledger ledger = accessor.create();
+        log.info("Created new ledger {}", ledger.getId());
 
         try {
-            boolean newLedger = ledgers.isEmpty();
+            boolean newLedgerCollection = ledgers.isEmpty();
             ledgers.append(ledger.getId());
 
-            if (newLedger) {
+            if (newLedgerCollection) {
                 store.create(stat, ledgers);
             } else {
                 store.update(stat, ledgers);

@@ -1,0 +1,5 @@
+language: "java"
+name: "ledgify"
+appmap_dir: "tmp/appmap"
+packages:
+- path: "dev.maynestream.ledgify"

@@ -42,6 +42,7 @@ public class TransactionCommitter extends LedgerCommitter<Transaction> implement
 
     @Override
     protected Entry<Transaction> attemptCommit(final Ledger ledger, Entry<Transaction> lastRecordedEntry) {
+        log.info("Attempting to commit transaction to ledger {}", ledger.getId());
         final AtomicReference<Entry<Transaction>> committedEntry = new AtomicReference<>(lastRecordedEntry);
         doCommit(ledger, committedEntry);
         return committedEntry.get();
