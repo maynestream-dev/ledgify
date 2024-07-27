@@ -1,8 +1,8 @@
 package dev.maynestream.ledgify.ledger;
 
-import dev.maynestream.ledgify.ledger.bookkeeper.BookkeeperContainer;
-import dev.maynestream.ledgify.ledger.bookkeeper.ContainerCluster;
-import dev.maynestream.ledgify.ledger.bookkeeper.ZookeeperContainer;
+import dev.maynestream.ledgify.ledger.testcontainers.BookkeeperContainer;
+import dev.maynestream.ledgify.ledger.testcontainers.ContainerCluster;
+import dev.maynestream.ledgify.ledger.testcontainers.ZookeeperContainer;
 import org.springframework.boot.devtools.restart.RestartScope;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
@@ -10,11 +10,11 @@ import org.testcontainers.containers.Network;
 
 import java.util.Set;
 
-import static dev.maynestream.ledgify.ledger.bookkeeper.BookkeeperContainer.BOOKKEEPER_ZK_PATH;
-import static dev.maynestream.ledgify.ledger.bookkeeper.ZookeeperContainer.ZOOKEEPER_CLIENT_PORT;
+import static dev.maynestream.ledgify.ledger.testcontainers.BookkeeperContainer.BOOKKEEPER_ZK_PATH;
+import static dev.maynestream.ledgify.ledger.testcontainers.ZookeeperContainer.ZOOKEEPER_CLIENT_PORT;
 
 @TestConfiguration(proxyBeanMethods = false)
-class TestcontainersConfiguration {
+public class TestcontainersConfiguration {
 
     private static final Network NETWORK = Network.newNetwork();
     private static final int ZOOKEEPER_CLUSTER_SIZE = 3;

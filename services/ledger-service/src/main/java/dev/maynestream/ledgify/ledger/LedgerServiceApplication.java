@@ -5,6 +5,9 @@ import dev.maynestream.ledgify.ledger.error.GrpcLedgerExceptionAdvice;
 import org.apache.bookkeeper.client.BKException;
 import org.apache.bookkeeper.client.BookKeeper;
 import org.apache.bookkeeper.conf.ClientConfiguration;
+import org.apache.curator.framework.CuratorFramework;
+import org.apache.curator.framework.CuratorFrameworkFactory;
+import org.apache.curator.retry.ExponentialBackoffRetry;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
@@ -37,6 +40,17 @@ public class LedgerServiceApplication {
         config.setMetadataServiceUri(bookkeeperConfiguration.getMetadataServiceUri());
         config.setAddEntryTimeout(2000);
         return BookKeeper.forConfig(config).build();
+    }
+
+    @Bean
+    CuratorFramework curatorClient(BookkeeperConfiguration bookkeeperConfiguration) throws InterruptedException {
+        final CuratorFramework curator = CuratorFrameworkFactory.newClient(bookkeeperConfiguration.getZkServers(),
+                                                                           2000,
+                                                                           10000,
+                                                                           new ExponentialBackoffRetry(1000, 3));
+        curator.start();
+        curator.blockUntilConnected();
+        return curator;
     }
 }
 

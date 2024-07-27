@@ -13,20 +13,14 @@
 
     <packaging>pom</packaging>
 
-    <properties>
-        <ledgify-domain.version>1.0.0-SNAPSHOT</ledgify-domain.version>
-
-        <!-- build -->
-    </properties>
+    <properties />
 
     <dependencies>
         <!-- internal -->
         <dependency>
             <groupId>dev.maynestream.ledgify</groupId>
             <artifactId>ledgify-domain</artifactId>
-            <version>${ledgify-domain.version}</version>
         </dependency>
-
         <dependency>
             <groupId>dev.maynestream.ledgify</groupId>
             <artifactId>ledgify-grpc-service-common</artifactId>
@@ -60,6 +54,12 @@
         </dependency>
 
         <!-- test -->
+        <dependency>
+            <groupId>dev.maynestream.ledgify</groupId>
+            <artifactId>ledgify-grpc-service-common</artifactId>
+            <type>test-jar</type>
+            <scope>test</scope>
+        </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-test</artifactId>

@@ -21,12 +21,28 @@
         <module>ledgify-grpc-service-common</module>
     </modules>
 
+    <properties>
+        <ledgify-domain.version>1.0.0-SNAPSHOT</ledgify-domain.version>
+    </properties>
+
     <dependencyManagement>
         <dependencies>
             <dependency>
                 <groupId>dev.maynestream.ledgify</groupId>
+                <artifactId>ledgify-domain</artifactId>
+                <version>${ledgify-domain.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>dev.maynestream.ledgify</groupId>
                 <artifactId>ledgify-grpc-service-common</artifactId>
                 <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>dev.maynestream.ledgify</groupId>
+                <artifactId>ledgify-grpc-service-common</artifactId>
+                <version>${project.version}</version>
+                <type>test-jar</type>
+                <scope>test</scope>
             </dependency>
         </dependencies>
     </dependencyManagement>

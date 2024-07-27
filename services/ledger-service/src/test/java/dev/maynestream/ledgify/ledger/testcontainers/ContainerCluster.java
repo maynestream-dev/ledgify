@@ -1,4 +1,4 @@
-package dev.maynestream.ledgify.ledger.bookkeeper;
+package dev.maynestream.ledgify.ledger.testcontainers;
 
 import lombok.Getter;
 import org.testcontainers.containers.GenericContainer;

@@ -17,6 +17,7 @@
 
     <properties>
         <bookkeeper.version>4.17.1</bookkeeper.version>
+        <curator-recipes.version>5.7.0</curator-recipes.version>
     </properties>
 
     <dependencies>
@@ -25,6 +26,11 @@
             <groupId>org.apache.bookkeeper</groupId>
             <artifactId>bookkeeper-server-shaded</artifactId>
             <version>${bookkeeper.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.curator</groupId>
+            <artifactId>curator-recipes</artifactId>
+            <version>${curator-recipes.version}</version>
         </dependency>
 
         <!-- test -->

@@ -16,6 +16,12 @@
     <properties />
 
     <dependencies>
+        <!-- internal -->
+        <dependency>
+            <groupId>dev.maynestream.ledgify</groupId>
+            <artifactId>ledgify-domain</artifactId>
+        </dependency>
+
         <!-- Spring -->
         <dependency>
             <groupId>org.springframework</groupId>
@@ -38,11 +44,20 @@
             <artifactId>lombok</artifactId>
             <optional>true</optional>
         </dependency>
+        <dependency>
+            <groupId>org.apache.commons</groupId>
+            <artifactId>commons-lang3</artifactId>
+        </dependency>
 
         <!-- test -->
         <dependency>
             <groupId>com.asarkar.grpc</groupId>
             <artifactId>grpc-test</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.hamcrest</groupId>
+            <artifactId>hamcrest</artifactId>
+            <scope>test</scope>
         </dependency>
     </dependencies>
 </project>

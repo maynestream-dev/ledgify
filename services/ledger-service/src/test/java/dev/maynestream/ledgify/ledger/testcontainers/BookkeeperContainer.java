@@ -1,4 +1,4 @@
-package dev.maynestream.ledgify.ledger.bookkeeper;
+package dev.maynestream.ledgify.ledger.testcontainers;
 
 import lombok.extern.slf4j.Slf4j;
 import org.slf4j.event.Level;
@@ -10,7 +10,7 @@ import org.testcontainers.utility.DockerImageName;
 import java.time.Duration;
 import java.util.Set;
 
-import static dev.maynestream.ledgify.ledger.bookkeeper.ZookeeperContainer.ZOOKEEPER_CLIENT_PORT;
+import static dev.maynestream.ledgify.ledger.testcontainers.ZookeeperContainer.ZOOKEEPER_CLIENT_PORT;
 
 @Slf4j
 public class BookkeeperContainer extends GenericContainer<BookkeeperContainer> {
