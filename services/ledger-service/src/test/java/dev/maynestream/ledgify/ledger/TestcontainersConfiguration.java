@@ -6,7 +6,6 @@ import dev.maynestream.ledgify.ledger.testcontainers.ZookeeperContainer;
 import org.springframework.boot.devtools.restart.RestartScope;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
-import org.springframework.test.context.TestPropertySource;
 import org.testcontainers.containers.Network;
 
 import java.util.Set;
@@ -14,7 +13,6 @@ import java.util.Set;
 import static dev.maynestream.ledgify.ledger.testcontainers.BookkeeperContainer.BOOKKEEPER_ZK_PATH;
 import static dev.maynestream.ledgify.ledger.testcontainers.ZookeeperContainer.ZOOKEEPER_CLIENT_PORT;
 
-@TestPropertySource("classpath:application.properties")
 @TestConfiguration(proxyBeanMethods = false)
 public class TestcontainersConfiguration {
 
