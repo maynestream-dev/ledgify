@@ -9,6 +9,7 @@ import dev.maynestream.ledgify.transaction.TransactionTestFixtures;
 import lombok.SneakyThrows;
 import org.apache.bookkeeper.client.BookKeeper;
 import org.apache.curator.framework.CuratorFramework;
+import org.junit.jupiter.api.RepeatedTest;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -40,7 +41,7 @@ class TransactionCommitterTest {
     @Autowired
     private CuratorFramework curator;
 
-    @Test
+    @RepeatedTest(10)
     public void shouldMaintainOrderOfSerialCommits() {
         // given
         final UUID accountId = randomId();
@@ -49,10 +50,8 @@ class TransactionCommitterTest {
         final List<Transaction> expected = generateTransactions(accountId, transactionCount);
 
         // when
-        try (final TransactionCommitter committer = getCommitter(accountId, log);
-             final TransactionCommitter follower = getCommitter(accountId, log)) {
+        try (final TransactionCommitter committer = getCommitter(accountId, log)) {
             new Thread(committer).start();
-            new Thread(follower).start();
 
             expected.forEach(t -> submit(log, t));
 
@@ -63,7 +62,7 @@ class TransactionCommitterTest {
         assertThat(log.getCommits(), contains(expected.toArray(new Transaction[0])));
     }
 
-    @Test
+    @RepeatedTest(10)
     public void shouldCorrectlyReadTransactionsAfterCommit() throws InterruptedException {
         // given
         final UUID accountId = randomId();
@@ -93,37 +92,54 @@ class TransactionCommitterTest {
         assertThat(actual, contains(expected.toArray(new Transaction[0])));
     }
 
-    @Test
+    @RepeatedTest(10)
     public void shouldMaintainOrderOfSerialCommitsIfLeaderChangesDueToInterrupt() {
         // given
         final UUID accountId = randomId();
-        final int transactionCount = 10;
         final TransactionLog log = new TransactionLog(accountId);
         final List<Transaction> expected = new ArrayList<>();
+        final int transactionCount = 10;
 
         // when
-        try (final TransactionCommitter committer = getCommitter(accountId, log);
-             final TransactionCommitter follower = getCommitter(accountId, log)) {
-            final Thread committerThread = new Thread(committer);
-            committerThread.start();
-            new Thread(follower).start();
-            generateTransactions(accountId, transactionCount).stream()
-                                                             .peek(expected::add)
-                                                             .forEach(t -> submit(log, t));
+        try (final TransactionCommitter initialLeader = getCommitter(accountId, log)) {
+            final Thread initialLeaderThread = new Thread(initialLeader);
+            initialLeaderThread.start();
 
-            await().atMost(Duration.ofSeconds(20)).until(() -> log.getCommits().size() == transactionCount);
+            // await leader election
+            await().atMost(Duration.ofSeconds(5)).until(initialLeader::isLeader);
 
-            committerThread.interrupt();
+            attemptSubmitTransactions(accountId, expected, log, transactionCount, transactionCount);
 
-            generateTransactions(accountId, transactionCount).stream()
-                                                             .peek(expected::add)
-                                                             .forEach(t -> submit(log, t));
+            try (final TransactionCommitter resumingLeader = getCommitter(accountId, log)) {
+                final Thread resumingLeaderThread = new Thread(resumingLeader);
+                resumingLeaderThread.start();
 
-            await().atMost(Duration.ofSeconds(20)).until(() -> log.getCommits().size() == transactionCount * 2);
+                attemptSubmitTransactions(accountId, expected, log, transactionCount, transactionCount * 2);
+
+                // signal leadership change
+                initialLeaderThread.interrupt();
+
+                // await leader switch
+                await().atMost(Duration.ofSeconds(5)).until(resumingLeader::isLeader);
+
+                attemptSubmitTransactions(accountId, expected, log, transactionCount, transactionCount * 3);
+            }
         }
 
         // then
         assertThat(log.getCommits(), contains(expected.toArray(new Transaction[0])));
+    }
+
+    private static void attemptSubmitTransactions(final UUID accountId,
+                                                  final List<Transaction> expected,
+                                                  final TransactionLog log,
+                                                  final int transactionCount,
+                                                  final int awaitCount) {
+        generateTransactions(accountId, transactionCount).stream()
+                                                         .peek(expected::add)
+                                                         .forEach(t -> submit(log, t));
+
+        await().atMost(Duration.ofSeconds(20)).until(() -> log.getCommits().size() == awaitCount);
     }
 
     private static List<Transaction> generateTransactions(final UUID accountId, final int transactionCount) {
@@ -140,7 +156,8 @@ class TransactionCommitterTest {
     }
 
     private TransactionCommitter getCommitter(final UUID accountId, final TransactionLog log) {
-        return new TransactionCommitter(bookkeeper,
+        return new TransactionCommitter(UUID.randomUUID(),
+                                        bookkeeper,
                                         bookkeeperConfiguration,
                                         curator,
                                         log,
@@ -149,7 +166,8 @@ class TransactionCommitterTest {
     }
 
     private TransactionReader getReader(final UUID accountId, final Consumer<Ledger.Entry<Transaction>> consumer) {
-        return new TransactionReader(bookkeeper,
+        return new TransactionReader(UUID.randomUUID(),
+                                     bookkeeper,
                                      bookkeeperConfiguration,
                                      curator,
                                      accountId,

@@ -1,5 +1,6 @@
 package dev.maynestream.ledgify.ledger.commit;
 
+import dev.maynestream.ledgify.ledger.commit.logging.LedgerLoggingContext;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.curator.framework.CuratorFramework;
 import org.apache.curator.framework.recipes.leader.LeaderSelector;
@@ -9,17 +10,20 @@ import java.util.Objects;
 import java.util.UUID;
 
 @Slf4j
-public class NaiveLeaderFlag extends LeaderSelectorListenerAdapter implements AutoCloseable {
+public class CuratorLeaderFlag extends LeaderSelectorListenerAdapter implements AutoCloseable {
     private static final String LEDGERS_ELECT_PATH_FORMAT = "/ledgers-elect/%s";
 
     private final LeaderSelector leaderSelector;
-    private final UUID uniqueId;
+    private final UUID electionGroupId;
+    private volatile Thread curatorThread;
 
-    public NaiveLeaderFlag(final CuratorFramework curator, final UUID uniqueId) {
+    public CuratorLeaderFlag(final CuratorFramework curator, final UUID electionGroupId, final UUID uniqueId) {
+        Objects.requireNonNull(curator, "curator cannot be null");
+        Objects.requireNonNull(electionGroupId, "uniqueId cannot be null");
         Objects.requireNonNull(uniqueId, "uniqueId cannot be null");
 
-        this.leaderSelector = initialiseLeaderSelector(curator, uniqueId);
-        this.uniqueId = uniqueId;
+        this.leaderSelector = initialiseLeaderSelector(curator, electionGroupId);
+        this.electionGroupId = electionGroupId;
     }
 
     public boolean isLeader() {
@@ -29,10 +33,14 @@ public class NaiveLeaderFlag extends LeaderSelectorListenerAdapter implements Au
     @Override
     public void takeLeadership(final CuratorFramework client) {
         synchronized (this) {
-            log.info("Becoming leader - {}", uniqueId);
+            try (final var ignore = LedgerLoggingContext.ledger(true, electionGroupId)) {
+                log.info("Becoming leader");
+            }
 
             try {
                 while (true) {
+                    curatorThread = Thread.currentThread();
+
                     this.wait();
                 }
             } catch (InterruptedException ie) {
@@ -54,5 +62,12 @@ public class NaiveLeaderFlag extends LeaderSelectorListenerAdapter implements Au
         leaderSelector.start();
 
         return leaderSelector;
+    }
+
+    public void interrupted() {
+        final Thread curatorThread = this.curatorThread;
+        if (curatorThread != null) {
+            curatorThread.interrupt();
+        }
     }
 }

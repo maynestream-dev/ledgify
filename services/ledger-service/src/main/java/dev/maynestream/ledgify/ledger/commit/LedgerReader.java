@@ -1,12 +1,12 @@
 package dev.maynestream.ledgify.ledger.commit;
 
 import dev.maynestream.ledgify.ledger.commit.Ledger.Entry;
-import lombok.extern.slf4j.Slf4j;
 import org.apache.zookeeper.KeeperException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.Objects;
+import java.util.UUID;
 import java.util.function.Consumer;
 import java.util.function.Function;
 
@@ -15,22 +15,25 @@ public abstract class LedgerReader<T> {
 
     protected final Logger log = LoggerFactory.getLogger(getClass());
 
+    protected final UUID uniqueId;
     final LedgerAccessor accessor;
     final LedgerCollectionStore store;
     final Consumer<Entry<T>> consumer;
     final Function<byte[], T> transformer;
 
-    protected LedgerReader(final LedgerAccessor accessor,
+    protected LedgerReader(final UUID uniqueId,
+                           final LedgerAccessor accessor,
                            final LedgerCollectionStore store,
                            final Consumer<Entry<T>> consumer,
                            final Function<byte[], T> transformer) {
+        this.uniqueId = Objects.requireNonNull(uniqueId, "uniqueId cannot be null");
         this.accessor = Objects.requireNonNull(accessor, "accessor cannot be null");
         this.store = Objects.requireNonNull(store, "store cannot be null");
         this.consumer = Objects.requireNonNull(consumer, "consumer cannot be null");
         this.transformer = Objects.requireNonNull(transformer, "transformer cannot be null");
     }
 
-    protected boolean isLeader() {
+    public boolean isLeader() {
         return false;
     }
 
@@ -39,32 +42,36 @@ public abstract class LedgerReader<T> {
     }
 
     public void readAll(final boolean follow) throws Exception {
-        Entry<T> lastRecordedEntry = Entry.initial();
-
-        log.info("Reading all entries from {}", lastRecordedEntry);
-        do {
-            lastRecordedEntry = readFrom(lastRecordedEntry, follow);
-
-            Thread.sleep(LEDGER_COMMIT_AWAIT_MILLIS);
-        } while (!Thread.interrupted() && !isLeader() && follow);
+        readFrom(Entry.initial(), follow);
     }
 
     protected Entry<T> readFrom(final Entry<T> entry, final boolean follow) throws Exception {
-        LedgerCollection ledgers = load(entry, follow);
-
-        if (ledgers == null) {
-            log.debug("No ledgers found and follow not specified");
-            return entry;
-        }
+        log.info("Reading entries from {}", entry);
 
         Entry<T> lastRecordedEntry = entry;
         do {
-            // record all unread entries
-            lastRecordedEntry = consumeUnrecorded(lastRecordedEntry, ledgers);
+            LedgerCollection ledgers = load(lastRecordedEntry, follow); // initial load
 
-            // update the list of unread entries
-            ledgers = load(entry, follow);
-        } while (!isLeader() && follow);
+            if (ledgers == null) {
+                log.debug("No ledgers found and follow not specified");
+                return lastRecordedEntry;
+            }
+
+            do {
+                // record all unread entries
+                lastRecordedEntry = consumeUnrecorded(lastRecordedEntry, ledgers);
+
+                // load any updates
+                ledgers = load(lastRecordedEntry, follow);
+
+                // continue until there's new no ledgers to consume (break early if we're now leader)
+            } while (!isLeader() && !ledgers.since(lastRecordedEntry.ledgerId()).isEmpty());
+
+            // await potential new commits to the
+            if (follow) {
+                Thread.sleep(LEDGER_COMMIT_AWAIT_MILLIS);
+            }
+        } while (!Thread.interrupted() && !isLeader() && follow);
 
         return lastRecordedEntry;
     }
@@ -72,15 +79,16 @@ public abstract class LedgerReader<T> {
     private LedgerCollection load(final Entry<T> entry, final boolean follow) throws Exception {
         LedgerCollection ledgers = null;
 
-        log.info("Waiting for initial ledger collection");
+        log.info("Loading ledger collection since {}", entry.ledgerId());
+
         // wait for leader to write
         do {
             try {
                 ledgers = store.load();
-                log.debug("Loaded initial ledger collection {}", ledgers);
+                log.debug("Loaded ledger collection {}", ledgers);
                 if (entry.exists()) { // only get ledgers that haven't been seen
                     ledgers = ledgers.since(entry.ledgerId());
-                    log.debug("Truncating initial ledger collection to {}", ledgers);
+                    log.debug("Truncating ledger collection to {}", ledgers);
                 }
                 // on first load leader may not yet have created ledger collection
             } catch (KeeperException.NoNodeException nne) {
@@ -88,6 +96,9 @@ public abstract class LedgerReader<T> {
                 Thread.sleep(1000);
             }
         } while (!isLeader() && ledgers == null && follow);
+
+        log.info("Loaded ledger collection {}", ledgers);
+
         return ledgers;
     }
 
@@ -106,7 +117,7 @@ public abstract class LedgerReader<T> {
 
                 // if there are unread entries remaining on this ledger (according to the read-only handle)
                 if (startingEntry <= ledger.getLastRecordedEntryId()) {
-                    log.debug("Reading ledger {} to consume from entry {}", ledgerId, startingEntry);
+                    log.info("Reading ledger {} to consume from entry {}", ledgerId, startingEntry);
                     // read and record the remaining entries in the ledger
                     lastRecordedEntry = consumeEntries(ledger, lastRecordedEntry, startingEntry);
                 }

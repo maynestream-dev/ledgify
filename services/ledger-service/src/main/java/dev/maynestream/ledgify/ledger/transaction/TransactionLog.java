@@ -1,5 +1,6 @@
 package dev.maynestream.ledgify.ledger.transaction;
 
+import dev.maynestream.ledgify.ledger.transaction.logging.TransactionLoggingContext;
 import dev.maynestream.ledgify.transaction.Transaction;
 import dev.maynestream.ledgify.transaction.TransactionCommitState;
 import dev.maynestream.ledgify.transaction.TransactionCommitStatus;
@@ -46,7 +47,7 @@ public class TransactionLog {
     TransactionCommitState submit(final Transaction transaction) throws InterruptedException {
         validateTransaction(transaction);
 
-        try {
+        try (final var ignore = TransactionLoggingContext.account(accountId).transaction(transaction.getTransactionId())) {
             log.info("Submitting transaction {}", transaction.getTransactionId());
             if (submitted.offer(transaction, SUBMIT_TRANSACTION_TIMEOUT_SECS, TimeUnit.SECONDS)) {
                 log.info("Awaiting commit of submitted transaction {}", transaction.getTransactionId());
@@ -71,13 +72,17 @@ public class TransactionLog {
     }
 
     void awaitCommit(CommitAction consumer) throws Exception {
-        log.info("Awaiting transaction...");
-        final Transaction transaction = submitted.poll(AWAIT_TRANSACTION_TIMEOUT_SECS, TimeUnit.SECONDS);
+        try (var ignoreAcc = TransactionLoggingContext.account(accountId)) {
+            log.info("Awaiting transaction...");
+            final Transaction transaction = submitted.poll(AWAIT_TRANSACTION_TIMEOUT_SECS, TimeUnit.SECONDS);
 
-        if (transaction != null) {
-            consumer.commit(transaction);
-            commits.put(transaction, System.currentTimeMillis());
-            latch.countDown();
+            if (transaction != null) {
+                try (var ignoreTx = ignoreAcc.transaction(transaction.getTransactionId())) {
+                    consumer.commit(transaction);
+                    commits.put(transaction, System.currentTimeMillis());
+                    latch.countDown();
+                }
+            }
         }
     }
 

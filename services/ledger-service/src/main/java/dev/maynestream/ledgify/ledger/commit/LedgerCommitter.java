@@ -2,24 +2,27 @@ package dev.maynestream.ledgify.ledger.commit;
 
 import dev.maynestream.ledgify.ledger.commit.Ledger.Entry;
 import dev.maynestream.ledgify.ledger.commit.Ledger.LedgerException;
+import dev.maynestream.ledgify.ledger.commit.logging.LedgerLoggingContext;
 import lombok.SneakyThrows;
 import org.apache.zookeeper.KeeperException;
 import org.apache.zookeeper.data.Stat;
 
 import java.util.Objects;
+import java.util.UUID;
 import java.util.function.Consumer;
 import java.util.function.Function;
 
 public abstract class LedgerCommitter<T> extends LedgerReader<T> implements AutoCloseable, Runnable {
 
-    private final NaiveLeaderFlag flag;
+    private final CuratorLeaderFlag flag;
 
-    protected LedgerCommitter(final LedgerAccessor accessor,
+    protected LedgerCommitter(final UUID uniqueId,
+                              final LedgerAccessor accessor,
                               final LedgerCollectionStore store,
-                              final NaiveLeaderFlag flag,
+                              final CuratorLeaderFlag flag,
                               final Consumer<Entry<T>> consumer,
                               final Function<byte[], T> transformer) {
-        super(accessor, store, consumer, transformer);
+        super(uniqueId, accessor, store, consumer, transformer);
         this.flag = Objects.requireNonNull(flag, "flag cannot be null");
     }
 
@@ -29,32 +32,44 @@ public abstract class LedgerCommitter<T> extends LedgerReader<T> implements Auto
     }
 
     @Override
-    protected boolean isLeader() {
+    public boolean isLeader() {
         return flag.isLeader();
     }
 
-    @SneakyThrows
     @Override
+    @SneakyThrows
     public void run() {
         Entry<T> lastDisplayedEntry = Entry.initial();
 
         while (!Thread.interrupted()) {
             try {
-                if (isLeader()) {
-                    log.info("Operating as leader");
-                    lastDisplayedEntry = lead(lastDisplayedEntry);
-                } else {
-                    log.info("Operating as follower");
-                    lastDisplayedEntry = readFrom(lastDisplayedEntry, true);
+                final boolean leader = isLeader();
+                try (final var ignore = LedgerLoggingContext.ledger(leader, uniqueId)) {
+                    if (leader) {
+                        log.info("Operating as leader from {}", lastDisplayedEntry);
+                        lastDisplayedEntry = lead(lastDisplayedEntry);
+                    } else {
+                        log.info("Operating as follower from {}", lastDisplayedEntry);
+                        lastDisplayedEntry = readFrom(lastDisplayedEntry, true);
+                    }
+                } catch (LedgerException e) {
+                    if (e.interrupted()) {
+                        Thread.currentThread().interrupt();
+                    }
+                    lastDisplayedEntry = e.getLastRecordedEntry();
                 }
-            } catch (LedgerException e) {
-                if (e.interrupted()) {
-                    Thread.currentThread().interrupt();
-                }
-                lastDisplayedEntry = e.getLastRecordedEntry();
-            }
 
-            Thread.sleep(1000);
+                Thread.sleep(1000);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+
+                if (isLeader()) {
+                    try {
+                        flag.interrupted(); // relinquish leadership
+                    } catch (Exception ignore) {
+                    }
+                }
+            }
         }
     }
 
@@ -84,8 +99,7 @@ public abstract class LedgerCommitter<T> extends LedgerReader<T> implements Auto
         return lastRecordedEntry;
     }
 
-    private Entry<T> consumeUnrecorded(Entry<T> lastRecordedEntry,
-                                       final LedgerCollection ledgers) throws Exception {
+    private Entry<T> consumeUnrecorded(Entry<T> lastRecordedEntry, final LedgerCollection ledgers) throws Exception {
         final LedgerCollection missedLedgers = missedLedgers(lastRecordedEntry, ledgers);
         log.info("Consuming entries from missed ledgers {}", missedLedgers);
 

@@ -5,6 +5,7 @@ import dev.maynestream.ledgify.ledger.commit.Ledger.Entry;
 import dev.maynestream.ledgify.ledger.commit.LedgerAccessor;
 import dev.maynestream.ledgify.ledger.commit.LedgerCollectionStore;
 import dev.maynestream.ledgify.ledger.commit.LedgerReader;
+import dev.maynestream.ledgify.ledger.transaction.logging.TransactionLoggingContext;
 import dev.maynestream.ledgify.transaction.Transaction;
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
@@ -22,22 +23,29 @@ public class TransactionReader extends LedgerReader<Transaction> implements Runn
 
     private static final String DAILY_LEDGER_PATH_FORMAT = "%s/%s";
 
-    public TransactionReader(final BookKeeper bookKeeper,
+    private final UUID accountId;
+
+    public TransactionReader(final UUID uniqueId,
+                             final BookKeeper bookKeeper,
                              final BookkeeperConfiguration bookkeeperConfiguration,
                              final CuratorFramework curator,
-                             final UUID uniqueId,
+                             final UUID accountId,
                              final LocalDate date,
                              final Consumer<Entry<Transaction>> consumer) {
-        super(new LedgerAccessor(bookKeeper, bookkeeperConfiguration, requireNonNull(uniqueId).toString().getBytes()),
-              new LedgerCollectionStore(curator, DAILY_LEDGER_PATH_FORMAT.formatted(uniqueId, date)),
+        super(uniqueId,
+              new LedgerAccessor(bookKeeper, bookkeeperConfiguration, requireNonNull(accountId).toString().getBytes()),
+              new LedgerCollectionStore(curator, DAILY_LEDGER_PATH_FORMAT.formatted(accountId, date)),
               consumer,
               TransactionReader::parse);
+        this.accountId = accountId;
     }
 
     @Override
     @SneakyThrows
     public void run() {
-        readAll(false);
+        try (final var ignore = TransactionLoggingContext.account(accountId)) {
+            readAll(false);
+        }
     }
 
     @SneakyThrows
