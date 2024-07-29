@@ -11,7 +11,7 @@ import java.util.function.Function;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
 
-public final class Ledger {
+public final class Ledger implements AutoCloseable {
     private final LedgerHandle ledgerHandle;
 
     Ledger(final LedgerHandle ledgerHandle) {
@@ -47,7 +47,8 @@ public final class Ledger {
         return ledgerHandle.isClosed();
     }
 
-    void close() throws Exception {
+    @Override
+    public void close() throws Exception {
         ledgerHandle.close();
     }
 
@@ -59,7 +60,7 @@ public final class Ledger {
                                     false);
     }
 
-    public record Entry<T>(long ledgerId, long entryId, T data) implements Comparable<Entry<T>> {
+    public record Entry<T>(long ledgerId, long entryId, T data) {
         private static final int NOT_EXISTS = -1;
 
         public static <T> Entry<T> initial() {
@@ -69,23 +70,32 @@ public final class Ledger {
         public boolean exists() {
             return entryId > NOT_EXISTS;
         }
-
-        @Override
-        public int compareTo(final Ledger.Entry<T> o) {
-            return 0;
-        }
     }
 
     public static class LedgerException extends RuntimeException {
         private final Entry<?> lastRecordedEntry;
+        private final boolean interrupted;
 
-        public LedgerException(final Entry<?> lastRecordedEntry) {
+        public LedgerException(final Entry<?> lastRecordedEntry, final Exception cause) {
+            super(cause);
             this.lastRecordedEntry = lastRecordedEntry;
+            this.interrupted = unwrap(cause) instanceof InterruptedException;
         }
 
         public <T> Entry<T> getLastRecordedEntry() {
             //noinspection unchecked
             return (Entry<T>) lastRecordedEntry;
+        }
+
+        public boolean interrupted() {
+            return interrupted;
+        }
+
+        private Throwable unwrap(Throwable cause) {
+            while (cause instanceof LedgerException) {
+                cause = cause.getCause();
+            }
+            return cause;
         }
     }
 }

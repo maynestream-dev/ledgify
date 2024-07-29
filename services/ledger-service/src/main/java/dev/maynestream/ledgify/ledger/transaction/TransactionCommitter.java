@@ -54,8 +54,8 @@ public class TransactionCommitter extends LedgerCommitter<Transaction> implement
                 committedEntry.set(ledger.addEntry(transaction, Transaction::toByteArray));
             });
         } catch (Exception e) {
-            log.error("Failed to commit transaction", e);
-            throw new LedgerException(committedEntry.get());
+            log.warn("Failed to commit transaction", e);
+            throw new LedgerException(committedEntry.get(), e);
         }
     }
 

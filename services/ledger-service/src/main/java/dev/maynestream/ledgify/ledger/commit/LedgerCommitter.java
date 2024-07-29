@@ -5,8 +5,6 @@ import dev.maynestream.ledgify.ledger.commit.Ledger.LedgerException;
 import lombok.SneakyThrows;
 import org.apache.zookeeper.KeeperException;
 import org.apache.zookeeper.data.Stat;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.util.Objects;
 import java.util.function.Consumer;
@@ -14,7 +12,6 @@ import java.util.function.Function;
 
 public abstract class LedgerCommitter<T> extends LedgerReader<T> implements AutoCloseable, Runnable {
 
-    private static final Logger log = LoggerFactory.getLogger(LedgerCommitter.class);
     private final NaiveLeaderFlag flag;
 
     protected LedgerCommitter(final LedgerAccessor accessor,
@@ -42,10 +39,19 @@ public abstract class LedgerCommitter<T> extends LedgerReader<T> implements Auto
         Entry<T> lastDisplayedEntry = Entry.initial();
 
         while (!Thread.interrupted()) {
-            if (isLeader()) {
-                lastDisplayedEntry = lead(lastDisplayedEntry);
-            } else {
-                lastDisplayedEntry = readFrom(lastDisplayedEntry);
+            try {
+                if (isLeader()) {
+                    log.info("Operating as leader");
+                    lastDisplayedEntry = lead(lastDisplayedEntry);
+                } else {
+                    log.info("Operating as follower");
+                    lastDisplayedEntry = readFrom(lastDisplayedEntry, true);
+                }
+            } catch (LedgerException e) {
+                if (e.interrupted()) {
+                    Thread.currentThread().interrupt();
+                }
+                lastDisplayedEntry = e.getLastRecordedEntry();
             }
 
             Thread.sleep(1000);
@@ -62,31 +68,24 @@ public abstract class LedgerCommitter<T> extends LedgerReader<T> implements Auto
         log.info("Loaded initial ledger collection {}", ledgers);
 
         try {
-            lastRecordedEntry = consumeUnrecordedTransactionsAsLeader(lastRecordedEntry, ledgers);
+            lastRecordedEntry = consumeUnrecorded(lastRecordedEntry, ledgers);
+        } catch (Exception e) {
+            throw new LedgerException(lastRecordedEntry, e);
+        }
 
-            final Ledger ledger = createNewLedger(stat, ledgers, lastRecordedEntry);
-
-            try {
-                while (isLeader()) {
-                    // attempt to commit transactions
-
-                    lastRecordedEntry = attemptCommit(ledger, lastRecordedEntry);
-                }
-
-                // close this ledger once we're no longer leader
-                ledger.close();
-            } catch (Exception e) {
-                // let it fall through to the return
+        try (final Ledger ledger = createNewLedger(stat, ledgers, lastRecordedEntry)) {
+            while (isLeader()) {
+                lastRecordedEntry = attemptCommit(ledger, lastRecordedEntry);
             }
-        } catch (LedgerException e) {
-            lastRecordedEntry = e.getLastRecordedEntry();
+        } catch (Exception e) {
+            throw new LedgerException(lastRecordedEntry, e);
         }
 
         return lastRecordedEntry;
     }
 
-    private Entry<T> consumeUnrecordedTransactionsAsLeader(Entry<T> lastRecordedEntry,
-                                                           final LedgerCollection ledgers) throws Exception {
+    private Entry<T> consumeUnrecorded(Entry<T> lastRecordedEntry,
+                                       final LedgerCollection ledgers) throws Exception {
         final LedgerCollection missedLedgers = missedLedgers(lastRecordedEntry, ledgers);
         log.info("Consuming entries from missed ledgers {}", missedLedgers);
 
@@ -99,7 +98,7 @@ public abstract class LedgerCommitter<T> extends LedgerReader<T> implements Auto
                 log.debug("Reading ledger {} to consume from entry {}", ledgerId, startingEntry);
                 ledger = accessor.openAsLeader(ledgerId);
             } catch (Exception e) {
-                throw new LedgerException(lastRecordedEntry);
+                throw new LedgerException(lastRecordedEntry, e);
             }
 
             // reset and continue if the end of the ledger has been reached
@@ -132,7 +131,7 @@ public abstract class LedgerCommitter<T> extends LedgerReader<T> implements Auto
                 store.update(stat, ledgers);
             }
         } catch (KeeperException.BadVersionException | KeeperException.NodeExistsException e) {
-            throw new LedgerException(lastRecordedEntry);
+            throw new LedgerException(lastRecordedEntry, e);
         }
         return ledger;
     }

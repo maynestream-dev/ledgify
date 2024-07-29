@@ -37,7 +37,7 @@ public class TransactionReader extends LedgerReader<Transaction> implements Runn
     @Override
     @SneakyThrows
     public void run() {
-        readAll();
+        readAll(false);
     }
 
     @SneakyThrows

@@ -3,14 +3,17 @@ package dev.maynestream.ledgify.ledger.commit;
 import dev.maynestream.ledgify.ledger.commit.Ledger.Entry;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.zookeeper.KeeperException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.Objects;
 import java.util.function.Consumer;
 import java.util.function.Function;
 
-@Slf4j
 public abstract class LedgerReader<T> {
     private static final int LEDGER_COMMIT_AWAIT_MILLIS = 1000;
+
+    protected final Logger log = LoggerFactory.getLogger(getClass());
 
     final LedgerAccessor accessor;
     final LedgerCollectionStore store;
@@ -32,37 +35,46 @@ public abstract class LedgerReader<T> {
     }
 
     public void readAll() throws Exception {
+        readAll(false);
+    }
+
+    public void readAll(final boolean follow) throws Exception {
         Entry<T> lastRecordedEntry = Entry.initial();
 
         log.info("Reading all entries from {}", lastRecordedEntry);
-        while (!Thread.interrupted() && !isLeader()) {
-            lastRecordedEntry = readFrom(lastRecordedEntry);
+        do {
+            lastRecordedEntry = readFrom(lastRecordedEntry, follow);
 
             Thread.sleep(LEDGER_COMMIT_AWAIT_MILLIS);
-        }
+        } while (!Thread.interrupted() && !isLeader() && follow);
     }
 
-    protected Entry<T> readFrom(final Entry<T> entry) throws Exception {
-        LedgerCollection ledgers = awaitInitialLedgerCollection(entry);
+    protected Entry<T> readFrom(final Entry<T> entry, final boolean follow) throws Exception {
+        LedgerCollection ledgers = load(entry, follow);
+
+        if (ledgers == null) {
+            log.debug("No ledgers found and follow not specified");
+            return entry;
+        }
 
         Entry<T> lastRecordedEntry = entry;
-        while (!isLeader()) {
-            // record all unread transactions
-            lastRecordedEntry = consumeUnrecordedTransactionsAsFollower(lastRecordedEntry, ledgers);
+        do {
+            // record all unread entries
+            lastRecordedEntry = consumeUnrecorded(lastRecordedEntry, ledgers);
 
-            // update the list of unread transaction entries
-            ledgers = store.load().since(lastRecordedEntry.ledgerId());
-        }
+            // update the list of unread entries
+            ledgers = load(entry, follow);
+        } while (!isLeader() && follow);
 
         return lastRecordedEntry;
     }
 
-    private LedgerCollection awaitInitialLedgerCollection(final Entry<T> entry) throws Exception {
+    private LedgerCollection load(final Entry<T> entry, final boolean follow) throws Exception {
         LedgerCollection ledgers = null;
 
         log.info("Waiting for initial ledger collection");
         // wait for leader to write
-        while (!isLeader() && ledgers == null) {
+        do {
             try {
                 ledgers = store.load();
                 log.debug("Loaded initial ledger collection {}", ledgers);
@@ -75,12 +87,12 @@ public abstract class LedgerReader<T> {
                 log.debug("No ledger collection found - awaiting initialization by leader");
                 Thread.sleep(1000);
             }
-        }
+        } while (!isLeader() && ledgers == null && follow);
         return ledgers;
     }
 
-    private Entry<T> consumeUnrecordedTransactionsAsFollower(Entry<T> lastRecordedEntry,
-                                                             final LedgerCollection ledgers) throws Exception {
+    private Entry<T> consumeUnrecorded(Entry<T> lastRecordedEntry,
+                                       final LedgerCollection ledgers) throws Exception {
         for (long ledgerId : ledgers) {
             long startingEntry = 0;
             while (!isLeader()) {
@@ -89,11 +101,12 @@ public abstract class LedgerReader<T> {
                     startingEntry = lastRecordedEntry.entryId() + 1;
                 }
 
-                log.debug("Reading ledger {} to consume from entry {}", ledgerId, startingEntry);
+                log.debug("Opening ledger {}", ledgerId);
                 final Ledger ledger = accessor.openForRead(ledgerId);
 
                 // if there are unread entries remaining on this ledger (according to the read-only handle)
                 if (startingEntry <= ledger.getLastRecordedEntryId()) {
+                    log.debug("Reading ledger {} to consume from entry {}", ledgerId, startingEntry);
                     // read and record the remaining entries in the ledger
                     lastRecordedEntry = consumeEntries(ledger, lastRecordedEntry, startingEntry);
                 }
