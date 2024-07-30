@@ -1,7 +1,6 @@
 package dev.maynestream.ledgify.ledger.transaction;
 
 import dev.maynestream.ledgify.ledger.BookkeeperConfiguration;
-import dev.maynestream.ledgify.ledger.commit.Ledger;
 import dev.maynestream.ledgify.ledger.commit.Ledger.Entry;
 import dev.maynestream.ledgify.transaction.Transaction;
 import org.apache.bookkeeper.client.BookKeeper;

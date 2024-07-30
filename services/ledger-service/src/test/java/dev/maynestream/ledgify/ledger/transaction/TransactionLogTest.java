@@ -1,5 +1,6 @@
 package dev.maynestream.ledgify.ledger.transaction;
 
+import dev.maynestream.ledgify.ledger.transaction.TransactionLog.CommitAttempt;
 import dev.maynestream.ledgify.transaction.Transaction;
 import dev.maynestream.ledgify.transaction.TransactionCommitState;
 import dev.maynestream.ledgify.transaction.TransactionCommitStatus;
@@ -39,7 +40,7 @@ class TransactionLogTest {
         final TransactionLog log = new TransactionLog(accountId);
 
         // when
-        final Executable submit = () -> log.submit(null);
+        final Executable submit = () -> log.submit(CommitAttempt.forTransaction(null));
 
         // then
         assertThrows(IllegalArgumentException.class, submit);
@@ -53,7 +54,7 @@ class TransactionLogTest {
         final Transaction transaction = transactionForDifferentAccounts().build();
 
         // when
-        final Executable submit = () -> log.submit(transaction);
+        final Executable submit = () -> log.submit(CommitAttempt.forTransaction(transaction));
 
         // then
         assertThrows(IllegalArgumentException.class, submit);
@@ -71,7 +72,7 @@ class TransactionLogTest {
             final Thread currentThread = Thread.currentThread();
             doConcurrentlyWithDelay(ofSeconds(1), currentThread::interrupt);
 
-            log.submit(transaction);
+            log.submit(CommitAttempt.forTransaction(transaction));
         };
 
         // then
@@ -91,15 +92,13 @@ class TransactionLogTest {
                 log.awaitCommit(t -> {
                     // simulate long commit time
                     Thread.sleep(ofSeconds(COMMIT_TRANSACTION_TIMEOUT_SECS + 1));
-
-                    return 0;
                 });
             });
 
             final Thread currentThread = Thread.currentThread();
             doConcurrentlyWithDelay(ofSeconds(SUBMIT_TRANSACTION_TIMEOUT_SECS - 3), currentThread::interrupt);
 
-            log.submit(transaction);
+            log.submit(CommitAttempt.forTransaction(transaction));
         };
 
         // then
@@ -114,7 +113,7 @@ class TransactionLogTest {
         final Transaction transaction = transactionForAccountDebit(accountId).build();
 
         // when
-        final TransactionCommitState state = log.submit(transaction);
+        final TransactionCommitState state = log.submit(CommitAttempt.forTransaction(transaction));
 
         assertThat(state.getStatus(), equalTo(TransactionCommitStatus.FAILED));
     }
@@ -131,12 +130,10 @@ class TransactionLogTest {
             log.awaitCommit(t -> {
                 // simulate long commit time
                 Thread.sleep(ofSeconds(COMMIT_TRANSACTION_TIMEOUT_SECS + 1));
-
-                return 0;
             });
         });
 
-        final TransactionCommitState state = log.submit(transaction);
+        final TransactionCommitState state = log.submit(CommitAttempt.forTransaction(transaction));
 
         assertThat(state.getStatus(), equalTo(TransactionCommitStatus.UNKNOWN));
     }
@@ -150,10 +147,10 @@ class TransactionLogTest {
 
         // when
         doConcurrentlyWithDelay(ofSeconds(0), () -> {
-            log.awaitCommit(t -> { return 0; });
+            log.awaitCommit(t -> { });
         });
 
-        final TransactionCommitState state = log.submit(transaction);
+        final TransactionCommitState state = log.submit(CommitAttempt.forTransaction(transaction));
 
         assertThat(state.getStatus(), equalTo(TransactionCommitStatus.COMPLETED));
     }
@@ -169,7 +166,7 @@ class TransactionLogTest {
             final Thread currentThread = Thread.currentThread();
             doConcurrentlyWithDelay(ofMillis(500), currentThread::interrupt);
 
-            log.awaitCommit(transaction -> { return 0; });
+            log.awaitCommit(transaction -> { });
         };
 
         // then

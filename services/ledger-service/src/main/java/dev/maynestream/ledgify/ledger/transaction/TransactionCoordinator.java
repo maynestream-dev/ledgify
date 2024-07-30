@@ -4,6 +4,7 @@ import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
 import com.google.common.cache.RemovalListener;
+import dev.maynestream.ledgify.ledger.LedgerCommitResponse;
 import dev.maynestream.ledgify.transaction.Transaction;
 import dev.maynestream.ledgify.transaction.TransactionCommitState;
 import lombok.extern.slf4j.Slf4j;
@@ -17,6 +18,7 @@ import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Stream;
 
 @Slf4j
@@ -44,7 +46,7 @@ public class TransactionCoordinator implements Closeable {
         this.committerFactory = committerFactory;
     }
 
-    public TransactionCommitState routeTransaction(final UUID accountId, final Transaction transaction) throws InterruptedException, ExecutionException {
+    public LedgerCommitResponse routeTransaction(final UUID accountId, final Transaction transaction) throws InterruptedException, ExecutionException {
         return accountHandlers.get(accountId).handle(transaction);
     }
 
@@ -92,8 +94,10 @@ public class TransactionCoordinator implements Closeable {
             this.committers.forEach(executor::submit);
         }
 
-        synchronized TransactionCommitState handle(final Transaction transaction) throws InterruptedException {
-            return log.submit(transaction);
+        synchronized LedgerCommitResponse handle(final Transaction transaction) throws InterruptedException {
+            final AtomicLong entryId = new AtomicLong(0);
+            final TransactionCommitState result = log.submit(new TransactionLog.CommitAttempt(transaction, entryId));
+            return LedgerCommitResponse.newBuilder().setEntryId(entryId.get()).setState(result).build();
         }
 
         @Override

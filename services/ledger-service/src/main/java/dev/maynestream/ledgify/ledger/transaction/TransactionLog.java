@@ -15,6 +15,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.SynchronousQueue;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
 
 import static dev.maynestream.ledgify.transaction.TransactionCommitStatus.COMPLETED;
 import static dev.maynestream.ledgify.transaction.TransactionCommitStatus.FAILED;
@@ -26,7 +27,7 @@ public class TransactionLog {
     public static final int COMMIT_TRANSACTION_TIMEOUT_SECS = 10;
     public static final int AWAIT_TRANSACTION_TIMEOUT_SECS = 1;
 
-    private final SynchronousQueue<Transaction> submitted = new SynchronousQueue<>(true);
+    private final SynchronousQueue<CommitAttempt> submitted = new SynchronousQueue<>(true);
     private final CountDownLatch latch = new CountDownLatch(1);
 
     private final ConcurrentHashMap<Transaction, Long> commits = new ConcurrentHashMap<>();
@@ -44,13 +45,15 @@ public class TransactionLog {
         return transactions;
     }
 
-    TransactionCommitState submit(final Transaction transaction) throws InterruptedException {
+    TransactionCommitState submit(final CommitAttempt commitAttempt) throws InterruptedException {
+        final Transaction transaction = commitAttempt.transaction;
+
         validateTransaction(transaction);
 
         try (final var ignore = TransactionLoggingContext.account(accountId).transaction(transaction.getTransactionId())) {
             try {
                 log.info("Submitting transaction...");
-                if (submitted.offer(transaction, SUBMIT_TRANSACTION_TIMEOUT_SECS, TimeUnit.SECONDS)) {
+                if (submitted.offer(commitAttempt, SUBMIT_TRANSACTION_TIMEOUT_SECS, TimeUnit.SECONDS)) {
                     log.info("Awaiting commit of submitted transaction...");
                     if (latch.await(COMMIT_TRANSACTION_TIMEOUT_SECS, TimeUnit.SECONDS)) {
                         log.info("Transaction committed");
@@ -76,12 +79,12 @@ public class TransactionLog {
     void awaitCommit(CommitAction consumer) throws Exception {
         try (var ignoreAcc = TransactionLoggingContext.account(accountId)) {
             log.debug("Awaiting transaction...");
-            final Transaction transaction = submitted.poll(AWAIT_TRANSACTION_TIMEOUT_SECS, TimeUnit.SECONDS);
+            final CommitAttempt commitAttempt = submitted.poll(AWAIT_TRANSACTION_TIMEOUT_SECS, TimeUnit.SECONDS);
 
-            if (transaction != null) {
-                try (var ignoreTx = ignoreAcc.transaction(transaction.getTransactionId())) {
-                    consumer.commit(transaction);
-                    commits.put(transaction, System.currentTimeMillis());
+            if (commitAttempt != null) {
+                try (var ignoreTx = ignoreAcc.transaction(commitAttempt.transaction.getTransactionId())) {
+                    consumer.commit(commitAttempt);
+                    commits.put(commitAttempt.transaction, System.currentTimeMillis());
                     latch.countDown();
                 }
             }
@@ -110,6 +113,12 @@ public class TransactionLog {
     }
 
     interface CommitAction {
-        long commit(Transaction transaction) throws Exception;
+        void commit(CommitAttempt commitAttempt) throws Exception;
+    }
+
+    public record CommitAttempt(Transaction transaction, AtomicLong entryId) {
+        static CommitAttempt forTransaction(final Transaction transaction) {
+            return new CommitAttempt(transaction, new AtomicLong(0));
+        }
     }
 }

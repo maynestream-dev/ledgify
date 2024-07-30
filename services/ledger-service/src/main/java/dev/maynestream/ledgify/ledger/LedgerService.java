@@ -5,7 +5,6 @@ import dev.maynestream.ledgify.ledger.transaction.TransactionCoordinator;
 import dev.maynestream.ledgify.transaction.ListTransactionsRequest;
 import dev.maynestream.ledgify.transaction.ListTransactionsResponse;
 import dev.maynestream.ledgify.transaction.Transaction;
-import dev.maynestream.ledgify.transaction.TransactionCommitState;
 import io.grpc.stub.StreamObserver;
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
@@ -31,12 +30,8 @@ class LedgerService extends LedgerGrpc.LedgerImplBase {
     public void commitTransaction(LedgerCommitRequest request, StreamObserver<LedgerCommitResponse> responseObserver) {
         validate(request);
 
-        final TransactionCommitState state = transactionCoordinator.routeTransaction(accountId(request.getAccountId()),
-                                                                                     request.getTransaction());
-        final LedgerCommitResponse response = LedgerCommitResponse.newBuilder()
-//                                                                  .setEntryId()
-                                                                  .setState(state)
-                                                                  .build();
+        final LedgerCommitResponse response = transactionCoordinator.routeTransaction(accountId(request.getAccountId()),
+                                                                                      request.getTransaction());
 
         responseObserver.onNext(response);
         responseObserver.onCompleted();
