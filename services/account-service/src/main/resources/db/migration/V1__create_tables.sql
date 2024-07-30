@@ -22,7 +22,7 @@ CREATE TABLE transaction
     credit_account_id      UUID           NOT NULL,
     currency               VARCHAR(3)     NOT NULL,
     amount                 numeric(15, 6) NOT NULL CHECK (amount > 0),
-    state                  VARCHAR(20)    NOT NULL             DEFAULT 'PENDING' CHECK (state IN ('PENDING', 'COMPLETED', 'FAILED', 'UNKNOWN')),
+    state                  VARCHAR(20)    NOT NULL             DEFAULT 'PENDING' CHECK (state IN ('PROPOSED', 'PENDING', 'COMPLETED', 'FAILED', 'UNKNOWN')),
     state_context          VARCHAR(1000),
     created                TIMESTAMP      NOT NULL             DEFAULT now(),
     updated                TIMESTAMP      NOT NULL             DEFAULT now(),
@@ -65,6 +65,8 @@ CREATE FUNCTION check_transaction_submission()
     RETURNS TRIGGER AS
 $$
 BEGIN
+    NEW.state = 'PENDING'; -- clobber on insert
+
     IF (SELECT currency FROM account WHERE account.id = NEW.debit_account_id) <> NEW.currency THEN
         RAISE EXCEPTION 'debit account currency is not %', NEW.currency USING ERRCODE = 23514;
     END IF;

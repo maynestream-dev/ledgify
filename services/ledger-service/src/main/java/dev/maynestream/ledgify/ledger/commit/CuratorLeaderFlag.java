@@ -14,7 +14,7 @@ public class CuratorLeaderFlag extends LeaderSelectorListenerAdapter implements 
     private static final String LEDGERS_ELECT_PATH_FORMAT = "/ledgers-elect/%s";
 
     private final LeaderSelector leaderSelector;
-    private final UUID electionGroupId;
+    private final UUID uniqueId;
     private volatile Thread curatorThread;
 
     public CuratorLeaderFlag(final CuratorFramework curator, final UUID electionGroupId, final UUID uniqueId) {
@@ -23,7 +23,7 @@ public class CuratorLeaderFlag extends LeaderSelectorListenerAdapter implements 
         Objects.requireNonNull(uniqueId, "uniqueId cannot be null");
 
         this.leaderSelector = initialiseLeaderSelector(curator, electionGroupId);
-        this.electionGroupId = electionGroupId;
+        this.uniqueId = uniqueId;
     }
 
     public boolean isLeader() {
@@ -33,7 +33,7 @@ public class CuratorLeaderFlag extends LeaderSelectorListenerAdapter implements 
     @Override
     public void takeLeadership(final CuratorFramework client) {
         synchronized (this) {
-            try (final var ignore = LedgerLoggingContext.ledger(true, electionGroupId)) {
+            try (final var ignore = LedgerLoggingContext.ledger(true, uniqueId)) {
                 log.info("Becoming leader");
             }
 

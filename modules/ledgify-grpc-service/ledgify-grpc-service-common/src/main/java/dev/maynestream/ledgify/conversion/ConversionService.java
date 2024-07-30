@@ -6,11 +6,11 @@ import java.util.UUID;
 
 public interface ConversionService {
 
-    static UUID getUuid(String customerId, String uuidType) {
+    static UUID getUuid(String idString, String uuidType) {
         try {
-            return UUID.fromString(customerId);
+            return UUID.fromString(idString);
         } catch (NullPointerException | IllegalArgumentException e) {
-            throw new IllegalArgumentException("Invalid " + uuidType + " (UUID): " + customerId);
+            throw new IllegalArgumentException("Invalid " + uuidType + " (UUID): " + idString);
         }
     }
 

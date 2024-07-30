@@ -22,10 +22,11 @@ message TransactionDetails {
 }
 
 enum TransactionCommitStatus {
-  PENDING = 0;
-  COMPLETED = 1;
-  FAILED = 2;
-  UNKNOWN = 3;
+  PROPOSED = 0;
+  PENDING = 1;
+  COMPLETED = 2;
+  FAILED = 3;
+  UNKNOWN = 4;
 }
 
 message TransactionCommit {

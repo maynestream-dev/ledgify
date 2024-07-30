@@ -4,9 +4,21 @@ option java_multiple_files = true;
 option java_package = "dev.maynestream.ledgify.ledger";
 option java_outer_classname = "LedgerProto";
 
-import "google/protobuf/empty.proto";
+import "buf/validate/validate.proto";
 import "transaction.proto";
 
 service Ledger {
-  rpc CommitTransaction(Transaction) returns (google.protobuf.Empty);
+  rpc CommitTransaction(LedgerCommitRequest) returns (LedgerCommitResponse);
+
+  rpc ListTransactions(ListTransactionsRequest) returns (ListTransactionsResponse);
+}
+
+message LedgerCommitRequest {
+  string account_id = 1 [(buf.validate.field).string.uuid = true];
+  Transaction transaction = 2 [(buf.validate.field).required = true];
+}
+
+message LedgerCommitResponse {
+  int64 entry_id = 1 [(buf.validate.field).required = true, (buf.validate.field).int64.gte = 0];
+  TransactionCommitState state = 2 [(buf.validate.field).required = true];
 }

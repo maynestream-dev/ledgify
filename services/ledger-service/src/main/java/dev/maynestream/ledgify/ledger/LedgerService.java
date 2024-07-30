@@ -1,16 +1,18 @@
 package dev.maynestream.ledgify.ledger;
 
-import com.google.protobuf.Empty;
+import dev.maynestream.ledgify.conversion.ConversionService;
+import dev.maynestream.ledgify.ledger.transaction.TransactionCoordinator;
+import dev.maynestream.ledgify.transaction.ListTransactionsRequest;
+import dev.maynestream.ledgify.transaction.ListTransactionsResponse;
 import dev.maynestream.ledgify.transaction.Transaction;
+import dev.maynestream.ledgify.transaction.TransactionCommitState;
 import io.grpc.stub.StreamObserver;
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 import net.devh.boot.grpc.server.service.GrpcService;
-import org.apache.bookkeeper.client.BookKeeper;
-import org.apache.bookkeeper.client.api.DigestType;
-import org.apache.bookkeeper.client.api.WriteHandle;
 
-import java.util.Map;
+import java.util.Set;
+import java.util.UUID;
 
 import static dev.maynestream.ledgify.validation.ValidationService.validate;
 
@@ -18,30 +20,44 @@ import static dev.maynestream.ledgify.validation.ValidationService.validate;
 @GrpcService
 class LedgerService extends LedgerGrpc.LedgerImplBase {
 
-    private final BookKeeper bookKeeper;
-    private final BookkeeperConfiguration bookkeeperConfiguration;
+    private final TransactionCoordinator transactionCoordinator;
 
-    LedgerService(BookKeeper bookKeeper, BookkeeperConfiguration bookkeeperConfiguration) {
-        this.bookKeeper = bookKeeper;
-        this.bookkeeperConfiguration = bookkeeperConfiguration;
+    LedgerService(final TransactionCoordinator transactionCoordinator) {
+        this.transactionCoordinator = transactionCoordinator;
     }
 
     @Override
     @SneakyThrows
-    public void commitTransaction(Transaction request, StreamObserver<Empty> responseObserver) {
+    public void commitTransaction(LedgerCommitRequest request, StreamObserver<LedgerCommitResponse> responseObserver) {
         validate(request);
 
-        final WriteHandle ledger = bookKeeper.newCreateLedgerOp()
-                                             .withDigestType(DigestType.DUMMY)
-                                             .withPassword("password".getBytes()) // TODO obviously this isn't ideal
-                                             .withEnsembleSize(bookkeeperConfiguration.getDefaultEnsembleSize())
-                                             .withWriteQuorumSize(bookkeeperConfiguration.getDefaultWriteQuorumSize())
-                                             .withAckQuorumSize(bookkeeperConfiguration.getDefaultAckQuorumSize())
-                                             .withCustomMetadata(Map.of("account", request.toByteArray()))
-                                             .execute()
-                                             .get();
+        final TransactionCommitState state = transactionCoordinator.routeTransaction(accountId(request.getAccountId()),
+                                                                                     request.getTransaction());
+        final LedgerCommitResponse response = LedgerCommitResponse.newBuilder()
+//                                                                  .setEntryId()
+                                                                  .setState(state)
+                                                                  .build();
 
-        responseObserver.onNext(Empty.getDefaultInstance());
+        responseObserver.onNext(response);
         responseObserver.onCompleted();
+    }
+
+    @Override
+    @SneakyThrows
+    public void listTransactions(final ListTransactionsRequest request,
+                                 final StreamObserver<ListTransactionsResponse> responseObserver) {
+        validate(request);
+
+        final Set<Transaction> transactions = transactionCoordinator.listTransactions(accountId(request.getAccountId()));
+        final ListTransactionsResponse response = ListTransactionsResponse.newBuilder()
+                                                                          .addAllTransactions(transactions)
+                                                                          .build();
+
+        responseObserver.onNext(response);
+        responseObserver.onCompleted();
+    }
+
+    private static UUID accountId(final String accountId) {
+        return ConversionService.getUuid(accountId, "accountId");
     }
 }

@@ -10,7 +10,6 @@ import lombok.SneakyThrows;
 import org.apache.bookkeeper.client.BookKeeper;
 import org.apache.curator.framework.CuratorFramework;
 import org.junit.jupiter.api.RepeatedTest;
-import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
@@ -81,6 +80,40 @@ class TransactionCommitterTest {
             await().atMost(Duration.ofSeconds(20)).until(() -> log.getCommits().size() == transactionCount);
             thread.interrupt();
             thread.join();
+        }
+
+        final TransactionReader reader = getReader(accountId, e -> actual.add(e.data()));
+        final Thread readerThread = new Thread(reader);
+        readerThread.start();
+        readerThread.join(Duration.ofSeconds(20));
+
+        // then
+        assertThat(actual, contains(expected.toArray(new Transaction[0])));
+    }
+
+    @RepeatedTest(10)
+    public void shouldCorrectlyReadTransactionsAfterCommitByClosedCluster() throws InterruptedException {
+        // given
+        final UUID accountId = randomId();
+        final int transactionCount = 10;
+        final TransactionLog log = new TransactionLog(accountId);
+        final List<Transaction> expected = generateTransactions(accountId, transactionCount);
+        final List<Transaction> actual = new ArrayList<>();
+        final int iterations = 5;
+
+        // when
+        for (int i = 1; i < iterations; i++) {
+            try (final TransactionCommitter committer = getCommitter(accountId, log)) {
+                final Thread thread = new Thread(committer);
+                thread.start();
+
+                expected.forEach(t -> submit(log, t));
+
+                final int expectedSize = transactionCount * i;
+                await().atMost(Duration.ofSeconds(20)).until(() -> log.getCommits().size() == expectedSize);
+//                thread.interrupt();
+//                thread.join();
+            }
         }
 
         final TransactionReader reader = getReader(accountId, e -> actual.add(e.data()));

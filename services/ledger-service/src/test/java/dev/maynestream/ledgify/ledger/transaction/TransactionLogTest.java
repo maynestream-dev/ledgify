@@ -91,6 +91,8 @@ class TransactionLogTest {
                 log.awaitCommit(t -> {
                     // simulate long commit time
                     Thread.sleep(ofSeconds(COMMIT_TRANSACTION_TIMEOUT_SECS + 1));
+
+                    return 0;
                 });
             });
 
@@ -129,6 +131,8 @@ class TransactionLogTest {
             log.awaitCommit(t -> {
                 // simulate long commit time
                 Thread.sleep(ofSeconds(COMMIT_TRANSACTION_TIMEOUT_SECS + 1));
+
+                return 0;
             });
         });
 
@@ -146,7 +150,7 @@ class TransactionLogTest {
 
         // when
         doConcurrentlyWithDelay(ofSeconds(0), () -> {
-            log.awaitCommit(t -> { });
+            log.awaitCommit(t -> { return 0; });
         });
 
         final TransactionCommitState state = log.submit(transaction);
@@ -165,7 +169,7 @@ class TransactionLogTest {
             final Thread currentThread = Thread.currentThread();
             doConcurrentlyWithDelay(ofMillis(500), currentThread::interrupt);
 
-            log.awaitCommit(transaction -> { });
+            log.awaitCommit(transaction -> { return 0; });
         };
 
         // then

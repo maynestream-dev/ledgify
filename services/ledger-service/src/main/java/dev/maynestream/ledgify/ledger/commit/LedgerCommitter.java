@@ -9,12 +9,16 @@ import org.apache.zookeeper.data.Stat;
 
 import java.util.Objects;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 import java.util.function.Function;
 
 public abstract class LedgerCommitter<T> extends LedgerReader<T> implements AutoCloseable, Runnable {
 
+    private final AtomicBoolean running = new AtomicBoolean(false);
+
     private final CuratorLeaderFlag flag;
+    private volatile Thread workerThread;
 
     protected LedgerCommitter(final UUID uniqueId,
                               final LedgerAccessor accessor,
@@ -28,7 +32,12 @@ public abstract class LedgerCommitter<T> extends LedgerReader<T> implements Auto
 
     @Override
     public void close() {
-        flag.close();
+         flag.close();
+
+        final Thread thread = workerThread;
+        if (thread != null) {
+            thread.interrupt();
+        }
     }
 
     @Override
@@ -39,6 +48,12 @@ public abstract class LedgerCommitter<T> extends LedgerReader<T> implements Auto
     @Override
     @SneakyThrows
     public void run() {
+        if (!running.compareAndSet(false, true)) {
+            throw new IllegalStateException("Already running on thread " + workerThread.getName());
+        }
+
+        workerThread = Thread.currentThread();
+
         Entry<T> lastDisplayedEntry = Entry.initial();
 
         while (!Thread.interrupted()) {
@@ -71,6 +86,8 @@ public abstract class LedgerCommitter<T> extends LedgerReader<T> implements Auto
                 }
             }
         }
+
+        workerThread = null;
     }
 
     protected abstract Entry<T> attemptCommit(final Ledger ledger, Entry<T> lastRecordedEntry);

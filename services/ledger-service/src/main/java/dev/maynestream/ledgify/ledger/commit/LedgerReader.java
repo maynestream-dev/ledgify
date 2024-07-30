@@ -59,13 +59,13 @@ public abstract class LedgerReader<T> {
 
             do {
                 // record all unread entries
-                lastRecordedEntry = consumeUnrecorded(lastRecordedEntry, ledgers);
+                lastRecordedEntry = consumeUnrecorded(lastRecordedEntry, ledgers, follow);
 
                 // load any updates
-                ledgers = load(lastRecordedEntry, follow);
+                ledgers = load(lastRecordedEntry, false);
 
                 // continue until there's new no ledgers to consume (break early if we're now leader)
-            } while (!isLeader() && !ledgers.since(lastRecordedEntry.ledgerId()).isEmpty());
+            } while (!isLeader() && follow && !ledgers.since(lastRecordedEntry.ledgerId()).isEmpty());
 
             // await potential new commits to the
             if (follow) {
@@ -76,7 +76,7 @@ public abstract class LedgerReader<T> {
         return lastRecordedEntry;
     }
 
-    private LedgerCollection load(final Entry<T> entry, final boolean follow) throws Exception {
+    private LedgerCollection load(final Entry<T> entry, final boolean await) throws Exception {
         LedgerCollection ledgers = null;
 
         log.info("Loading ledger collection since {}", entry.ledgerId());
@@ -95,7 +95,7 @@ public abstract class LedgerReader<T> {
                 log.debug("No ledger collection found - awaiting initialization by leader");
                 Thread.sleep(1000);
             }
-        } while (!isLeader() && ledgers == null && follow);
+        } while (!isLeader() && ledgers == null && await);
 
         log.info("Loaded ledger collection {}", ledgers);
 
@@ -103,7 +103,8 @@ public abstract class LedgerReader<T> {
     }
 
     private Entry<T> consumeUnrecorded(Entry<T> lastRecordedEntry,
-                                       final LedgerCollection ledgers) throws Exception {
+                                       final LedgerCollection ledgers,
+                                       final boolean follow) throws Exception {
         for (long ledgerId : ledgers) {
             long startingEntry = 0;
             while (!isLeader()) {
@@ -120,11 +121,17 @@ public abstract class LedgerReader<T> {
                     log.info("Reading ledger {} to consume from entry {}", ledgerId, startingEntry);
                     // read and record the remaining entries in the ledger
                     lastRecordedEntry = consumeEntries(ledger, lastRecordedEntry, startingEntry);
+                    log.debug("Read from ledger {} to entry {}", ledgerId, lastRecordedEntry.entryId());
                 }
 
                 // if this ledger is closed, eagerly progress to the next
                 if (ledger.isClosed()) {
                     log.debug("Finished reading from closed ledger {}", ledgerId);
+                    break;
+                }
+
+                if (!follow) {
+                    log.debug("Eagerly breaking from no-follow open ledger {}", ledgerId);
                     break;
                 }
 

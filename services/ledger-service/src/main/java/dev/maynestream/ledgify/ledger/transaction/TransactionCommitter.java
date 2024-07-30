@@ -60,7 +60,10 @@ public class TransactionCommitter extends LedgerCommitter<Transaction> {
     private void doCommit(final Ledger ledger, final AtomicReference<Entry<Transaction>> committedEntry) {
         try {
             transactions.awaitCommit(transaction -> {
-                committedEntry.set(ledger.addEntry(transaction, Transaction::toByteArray));
+                final Entry<Transaction> entry = ledger.addEntry(transaction, Transaction::toByteArray);
+                committedEntry.set(entry);
+                log.info("Committed transaction as entry {}", entry.entryId());
+                return entry.entryId();
             });
         } catch (Exception e) {
             log.warn("Failed to commit transaction", e);

@@ -48,32 +48,34 @@ public class TransactionLog {
         validateTransaction(transaction);
 
         try (final var ignore = TransactionLoggingContext.account(accountId).transaction(transaction.getTransactionId())) {
-            log.info("Submitting transaction {}", transaction.getTransactionId());
-            if (submitted.offer(transaction, SUBMIT_TRANSACTION_TIMEOUT_SECS, TimeUnit.SECONDS)) {
-                log.info("Awaiting commit of submitted transaction {}", transaction.getTransactionId());
-                if (latch.await(COMMIT_TRANSACTION_TIMEOUT_SECS, TimeUnit.SECONDS)) {
-                    log.warn("Committed transaction {}", transaction.getTransactionId());
-                    return state(transaction, COMPLETED, "Transaction successfully committed");
+            try {
+                log.info("Submitting transaction...");
+                if (submitted.offer(transaction, SUBMIT_TRANSACTION_TIMEOUT_SECS, TimeUnit.SECONDS)) {
+                    log.info("Awaiting commit of submitted transaction...");
+                    if (latch.await(COMMIT_TRANSACTION_TIMEOUT_SECS, TimeUnit.SECONDS)) {
+                        log.info("Transaction committed");
+                        return state(transaction, COMPLETED, "Transaction successfully committed");
+                    } else {
+                        log.info("Commit timeout for transaction");
+                        return state(transaction, UNKNOWN, "Transaction took too long to commit");
+                    }
                 } else {
-                    log.info("Commit timeout for transaction {}", transaction.getTransactionId());
-                    return state(transaction, UNKNOWN, "Transaction took too long to commit");
+                    log.warn("Submit timeout for transaction");
+                    return state(transaction, FAILED, "Failed to submit transaction - no committers available");
                 }
-            } else {
-                log.warn("Submit timeout for transaction {}", transaction.getTransactionId());
-                return state(transaction, FAILED, "Failed to submit transaction - no committers available");
+            } catch (InterruptedException e) {
+                log.warn("Submit interrupted for transaction");
+                throw e;
+            } catch (Exception e) {
+                log.error("Exception during submit for transaction");
+                throw e;
             }
-        } catch (InterruptedException e) {
-            log.warn("Submit interrupted for transaction {}", transaction.getTransactionId());
-            throw e;
-        } catch (Exception e) {
-            log.error("Exception during submit for transaction {}", transaction.getTransactionId());
-            throw e;
         }
     }
 
     void awaitCommit(CommitAction consumer) throws Exception {
         try (var ignoreAcc = TransactionLoggingContext.account(accountId)) {
-            log.info("Awaiting transaction...");
+            log.debug("Awaiting transaction...");
             final Transaction transaction = submitted.poll(AWAIT_TRANSACTION_TIMEOUT_SECS, TimeUnit.SECONDS);
 
             if (transaction != null) {
@@ -108,6 +110,6 @@ public class TransactionLog {
     }
 
     interface CommitAction {
-        void commit(Transaction transaction) throws Exception;
+        long commit(Transaction transaction) throws Exception;
     }
 }
