@@ -82,6 +82,8 @@ public class TransactionLog {
             final CommitAttempt commitAttempt = submitted.poll(AWAIT_TRANSACTION_TIMEOUT_SECS, TimeUnit.SECONDS);
 
             if (commitAttempt != null) {
+                validateTransaction(commitAttempt.transaction);
+
                 try (var ignoreTx = ignoreAcc.transaction(commitAttempt.transaction.getTransactionId())) {
                     consumer.commit(commitAttempt);
                     commits.put(commitAttempt.transaction, System.currentTimeMillis());
@@ -95,9 +97,12 @@ public class TransactionLog {
         if (transaction == null) {
             throw new IllegalArgumentException("transaction cannot be null");
         } else if (!accountId.equals(UUID.fromString(transaction.getDetails()
-                                                                .getDebitAccountId())) && !accountId.equals(UUID.fromString(
-                transaction.getDetails().getCreditAccountId()))) {
+                                                                .getDebitAccountId()))
+                && !accountId.equals(UUID.fromString(transaction.getDetails()
+                                                                .getCreditAccountId()))) {
             throw new IllegalArgumentException("transaction submitted for incorrect account");
+        } else if (commits.keySet().stream().anyMatch(t -> t.getTransactionId().equals(transaction.getTransactionId()))) {
+            throw new IllegalArgumentException("transaction has already been submitted");
         }
     }
 
