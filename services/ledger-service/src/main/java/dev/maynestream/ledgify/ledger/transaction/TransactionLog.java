@@ -7,8 +7,9 @@ import dev.maynestream.ledgify.transaction.TransactionCommitStatus;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 
+import java.util.Comparator;
 import java.util.Objects;
-import java.util.Set;
+import java.util.SortedSet;
 import java.util.TreeSet;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -39,10 +40,8 @@ public class TransactionLog {
         this.accountId = Objects.requireNonNull(accountId, "accountId cannot be null");
     }
 
-    public Set<Transaction> getCommits() {
-        final Set<Transaction> transactions = new TreeSet<>((o1, o2) -> commits.get(o1).compareTo(commits.get(o2)));
-        transactions.addAll(commits.keySet());
-        return transactions;
+    public SortedSet<Transaction> getCommits() {
+        return sort(commits);
     }
 
     TransactionCommitState submit(final CommitAttempt commitAttempt) throws InterruptedException {
@@ -125,5 +124,11 @@ public class TransactionLog {
         static CommitAttempt forTransaction(final Transaction transaction) {
             return new CommitAttempt(transaction, new AtomicLong(0));
         }
+    }
+
+    public static SortedSet<Transaction> sort(final ConcurrentHashMap<Transaction, Long> commits) {
+        final SortedSet<Transaction> transactions = new TreeSet<>(Comparator.comparing(commits::get));
+        transactions.addAll(commits.keySet());
+        return transactions;
     }
 }

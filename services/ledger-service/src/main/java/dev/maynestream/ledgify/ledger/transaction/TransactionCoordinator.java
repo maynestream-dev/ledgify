@@ -11,10 +11,12 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.io.Closeable;
+import java.time.Duration;
 import java.time.LocalDate;
 import java.util.Collection;
-import java.util.Set;
+import java.util.SortedSet;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -34,7 +36,7 @@ public class TransactionCoordinator implements Closeable {
     public static final int DEFAULT_RESILIENCE_FACTOR = 3;
 
     private final LoadingCache<UUID, TransactionHandler> accountHandlers = CacheBuilder.newBuilder()
-//                                                                                       .expireAfterAccess(10, TimeUnit.SECONDS)
+//                                                                                       .expireAfterAccess(1, TimeUnit.SECONDS)
                                                                                        .removalListener((RemovalListener<UUID, TransactionHandler>) notification -> {
                                                                                            notification.getValue().close();
                                                                                        })
@@ -50,16 +52,21 @@ public class TransactionCoordinator implements Closeable {
         return accountHandlers.get(accountId).handle(transaction);
     }
 
-    public Set<Transaction> listTransactions(final UUID accountId) throws InterruptedException, ExecutionException {
-        return accountHandlers.get(accountId).log.getCommits();
-//        final List<Transaction> transactions = new ArrayList<>();
-//        final TransactionReader reader = committerFactory.createReader(accountId,
-//                                                                       LocalDate.now(),
-//                                                                       e -> transactions.add(e.data()));
-//        final Thread readerThread = new Thread(reader);
-//        readerThread.start();
-//        readerThread.join(Duration.ofSeconds(20));
-//        return transactions;
+    public SortedSet<Transaction> listTransactions(final UUID accountId) throws InterruptedException, ExecutionException {
+        final TransactionHandler handler = accountHandlers.getIfPresent(accountId);
+
+        if (handler != null) {
+            return handler.log.getCommits();
+        }
+
+        final ConcurrentHashMap<Transaction, Long> commits = new ConcurrentHashMap<>();
+        final TransactionReader reader = committerFactory.createReader(accountId,
+                                                                       LocalDate.now(),
+                                                                       e -> commits.put(e.data(), e.entryId()));
+        final Thread readerThread = new Thread(reader);
+        readerThread.start();
+        readerThread.join(Duration.ofSeconds(20));
+        return TransactionLog.sort(commits);
     }
 
     private TransactionHandler createHandler(final UUID uuid) {

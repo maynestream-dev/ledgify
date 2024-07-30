@@ -10,7 +10,7 @@ import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 import net.devh.boot.grpc.server.service.GrpcService;
 
-import java.util.Set;
+import java.util.SortedSet;
 import java.util.UUID;
 
 import static dev.maynestream.ledgify.validation.ValidationService.validate;
@@ -43,7 +43,7 @@ class LedgerService extends LedgerGrpc.LedgerImplBase {
                                  final StreamObserver<ListTransactionsResponse> responseObserver) {
         validate(request);
 
-        final Set<Transaction> transactions = transactionCoordinator.listTransactions(accountId(request.getAccountId()));
+        final SortedSet<Transaction> transactions = transactionCoordinator.listTransactions(accountId(request.getAccountId()));
         final ListTransactionsResponse response = ListTransactionsResponse.newBuilder()
                                                                           .addAllTransactions(transactions)
                                                                           .build();
